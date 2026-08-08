@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "DA SPORTZ",
+    "slug": "dasportz-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "dasportz",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dasportz.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp", "tel", "mailto", "https"]
+      }
+    },
+    "android": {
+      "minSdkVersion": 26,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.dasportz.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "./plugins/withAndroidLinkingQueries.js",
+      "./plugins/withZohoPayments.js"
+    ]
+  }
+}
