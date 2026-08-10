@@ -1,76 +1,149 @@
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
-import { ScreenHeader } from '../components/ScreenHeader';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { AppHeader } from '../components/AppHeader';
 import { ServiceCard } from '../components/ServiceCard';
-import { Button } from '../components/Button';
 import { services, highlights } from '../data/content';
 import { colors, spacing, typography, radius } from '../constants/theme';
-import { openWhatsApp } from '../utils/linking';
-import type { TabScreenProps } from '../navigation/types';
+import { openPhone, openWhatsApp } from '../utils/linking';
+import type { ServicesStackScreenProps } from '../navigation/types';
 
-type Props = TabScreenProps<'Services'>;
+type Props = ServicesStackScreenProps<'ServicesMain'>;
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const GRID_GAP = spacing.sm;
+const TILE_W = (SCREEN_W - spacing.lg * 2 - GRID_GAP) / 2;
+
+const [featuredService, ...otherServices] = services;
+
+const trustChips = [
+  { icon: 'flash-outline' as const, label: highlights[0].title.replace('Express ', '') },
+  { icon: 'car-outline' as const, label: 'Free 2km pickup' },
+  { icon: 'shield-checkmark-outline' as const, label: 'Quality checked' },
+];
 
 export function ServicesScreen({ navigation }: Props) {
+  function openService(serviceId: string) {
+    if (serviceId === 'badminton-stringing') {
+      navigation.navigate('StringingForm');
+      return;
+    }
+    navigation.navigate('ServiceDetail', { serviceId });
+  }
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <ScreenHeader
-        title="Services"
-        subtitle="Professional equipment care with pickup and fast turnaround."
+    <View style={styles.screen}>
+      <AppHeader
+        onSearchPress={() => navigation.navigate('Search')}
+        searchPlaceholder="Search stringing, repairs…"
       />
-
-      <View style={styles.highlights}>
-        {highlights.map((item) => (
-          <View key={item.title} style={styles.highlightPill}>
-            <Text style={styles.highlightText}>{item.title}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.content}>
-        {services.map((service) => (
-          <ServiceCard
-            key={service.id}
-            service={service}
-            onPress={() =>
-              service.id === 'badminton-stringing'
-                ? navigation.navigate('StringingForm')
-                : navigation.navigate('ServiceDetail', { serviceId: service.id })
-            }
-          />
-        ))}
-
-        <View style={styles.quoteCard}>
-          <Text style={styles.quoteTitle}>Need a quick quote?</Text>
-          <Text style={styles.quoteText}>
-            Send a photo of your equipment on WhatsApp and get instant guidance from our team.
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageIntro}>
+          <Text style={styles.title}>Care</Text>
+          <Text style={styles.subtitle}>
+            Expert stringing, repairs & knocking — pickup available near you.
           </Text>
-          <Button title="Get Instant Support" variant="whatsapp" onPress={() => openWhatsApp()} />
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.trustRow}>
+          {trustChips.map((chip) => (
+            <View key={chip.label} style={styles.trustChip}>
+              <Ionicons name={chip.icon} size={14} color={colors.primary} />
+              <Text style={styles.trustText}>{chip.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.content}>
+          <Text style={styles.sectionLabel}>MOST BOOKED</Text>
+          <ServiceCard
+            service={featuredService}
+            variant="featured"
+            onPress={() => openService(featuredService.id)}
+          />
+
+          <Text style={[styles.sectionLabel, styles.sectionSpacer]}>ALL SERVICES</Text>
+          <View style={styles.grid}>
+            {otherServices.map((service) => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                variant="compact"
+                width={TILE_W}
+                onPress={() => openService(service.id)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.helpCard}>
+            <View style={styles.helpCopy}>
+              <Text style={styles.helpTitle}>Need a quick quote?</Text>
+              <Text style={styles.helpSub}>
+                Send a photo of your gear — we’ll guide turnaround and pricing.
+              </Text>
+            </View>
+            <View style={styles.helpActions}>
+              <TouchableOpacity
+                style={styles.helpBtn}
+                onPress={() => openWhatsApp()}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color={colors.whatsapp} />
+                <Text style={styles.helpBtnText}>WhatsApp</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.helpBtn} onPress={() => openPhone()} activeOpacity={0.85}>
+                <Ionicons name="call-outline" size={18} color={colors.primary} />
+                <Text style={styles.helpBtnText}>Call</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  highlights: {
+  container: {
+    flex: 1,
+  },
+  pageIntro: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  title: {
+    ...typography.h1,
+    color: colors.text,
+  },
+  subtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+  trustRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
-  highlightPill: {
-    backgroundColor: colors.surfaceLight,
+  trustChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
   },
-  highlightText: {
+  trustText: {
     ...typography.caption,
     color: colors.textSecondary,
     fontWeight: '600',
@@ -79,22 +152,58 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  quoteCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  quoteTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  quoteText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+  sectionLabel: {
+    ...typography.label,
+    color: colors.primary,
     marginBottom: spacing.sm,
+  },
+  sectionSpacer: {
+    marginTop: spacing.md,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+    marginBottom: spacing.lg,
+  },
+  helpCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    overflow: 'hidden',
+  },
+  helpCopy: {
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  helpTitle: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  helpSub: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
+  helpActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  helpBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  helpBtnText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '700',
   },
 });

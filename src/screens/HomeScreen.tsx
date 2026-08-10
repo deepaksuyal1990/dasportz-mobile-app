@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   View,
@@ -6,32 +6,34 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HomeHeader, HOME_HEADER_HEIGHT } from '../components/HomeHeader';
-import { CategoryRow } from '../components/CategoryRow';
+import { HomeHeader, HOME_HEADER_HEIGHT } from '../components/AppHeader';
+import { CategoryCard } from '../components/CategoryCard';
 import { ServiceRow } from '../components/ServiceRow';
 import { QuickActionCard } from '../components/QuickActionCard';
+import { ProductRail } from '../components/ProductRail';
 import { AppFooter } from '../components/AppFooter';
-import { business, highlights, productCategories, services } from '../data/content';
-import { colors, spacing, typography, radius, shadows } from '../constants/theme';
-import { openWhatsApp } from '../utils/linking';
+import { business, contact, productCategories, services } from '../data/content';
+import { colors, spacing, typography, radius } from '../constants/theme';
+import { openPhone, openWhatsApp } from '../utils/linking';
 import { navigateToCategory } from '../utils/navigation';
 import { preloadSearchIndex } from '../services/searchService';
-import type { TabScreenProps } from '../navigation/types';
+import { fetchCricketProducts } from '../services/productsApi';
+import { pickBestsellers } from '../utils/productPicks';
+import type { CricketProduct } from '../types/product';
+import { navigateToTab } from '../utils/navHelpers';
+import type { HomeStackScreenProps } from '../navigation/types';
 
-type Props = TabScreenProps<'Home'>;
+type Props = HomeStackScreenProps<'HomeMain'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const statDisplay = [
-  { value: '25 min', label: 'Stringing' },
-  { value: '2 km', label: 'Free Pickup' },
-  { value: '10K+', label: 'Serviced' },
-  { value: '100%', label: 'Quality' },
-];
+const ACTION_CARD_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm) / 2;
+const HOME_SERVICES = services.slice(0, 3);
+const HOME_CATEGORIES = productCategories.slice(0, 3);
 
 const primaryActions = [
   {
@@ -68,15 +70,34 @@ const primaryActions = [
   },
 ];
 
-const ACTION_CARD_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm) / 2;
-
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerSpace = insets.top + HOME_HEADER_HEIGHT;
+  const [bestsellers, setBestsellers] = useState<CricketProduct[]>([]);
+  const [picksLoading, setPicksLoading] = useState(true);
 
   useEffect(() => {
     preloadSearchIndex();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        setPicksLoading(true);
+        const products = await fetchCricketProducts();
+        if (cancelled) return;
+        setBestsellers(pickBestsellers(products, 8));
+      } catch {
+        if (!cancelled) setBestsellers([]);
+      } finally {
+        if (!cancelled) setPicksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleAction(id: string) {
@@ -85,15 +106,23 @@ export function HomeScreen({ navigation }: Props) {
         navigation.navigate('StringingForm');
         break;
       case 'shop':
-        navigation.navigate('Products');
+        navigateToTab(navigation, 'Products');
         break;
       case 'services':
-        navigation.navigate('Services');
+        navigateToTab(navigation, 'Services');
         break;
       case 'contact':
-        navigation.navigate('Contact');
+        navigateToTab(navigation, 'Contact');
         break;
     }
+  }
+
+  function openProduct(product: CricketProduct) {
+    navigation.navigate('CricketProductDetail', { productId: product.id });
+  }
+
+  function openCricketBats() {
+    navigation.navigate('CricketBats');
   }
 
   return (
@@ -101,7 +130,6 @@ export function HomeScreen({ navigation }: Props) {
       <HomeHeader
         scrollY={scrollY}
         onSearchPress={() => navigation.navigate('Search')}
-        onLocationPress={() => navigation.navigate('Contact')}
       />
 
       <Animated.ScrollView
@@ -112,47 +140,48 @@ export function HomeScreen({ navigation }: Props) {
           useNativeDriver: true,
         })}
       >
-        {/* Hero */}
+        {/* Full-bleed photo hero */}
         <View style={[styles.heroSection, { paddingTop: headerSpace + spacing.md }]}>
+          <Image
+            source={require('../../assets/splash-background.jpg')}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
           <LinearGradient
-            colors={['#0C2A1E', '#0A1628', colors.background]}
-            locations={[0, 0.5, 1]}
+            colors={[
+              'rgba(2,8,20,0.55)',
+              'rgba(6,13,24,0.45)',
+              'rgba(6,13,24,0.88)',
+              colors.background,
+            ]}
+            locations={[0, 0.35, 0.75, 1]}
             style={StyleSheet.absoluteFill}
           />
 
-          <View style={styles.heroOrb1} />
-          <View style={styles.heroOrb2} />
-
           <View style={styles.heroInner}>
-            <View style={styles.pill}>
-              <View style={styles.pillDot} />
-              <Text style={styles.pillText}>100% Genuine · Official Brands</Text>
+            <View style={styles.heroBrandRow}>
+              <Text style={styles.heroBrand}>{business.name}</Text>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.heroLogo}
+                resizeMode="contain"
+              />
             </View>
-
-            <Text style={styles.heroTitle}>
-              Your sports{'\n'}
-              <Text style={styles.heroAccent}>destination</Text>
+            <Text style={styles.heroSub}>
+              Genuine gear & expert stringing — train, compete, win.
             </Text>
-
-            <Text style={styles.heroSub}>{business.description}</Text>
+            <TouchableOpacity
+              style={styles.heroCta}
+              onPress={() => navigateToTab(navigation, 'Products')}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.heroCtaText}>Shop Sports Gear</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.background} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsCard}>
-          {statDisplay.map((item, i) => (
-            <View
-              key={item.label}
-              style={[styles.statItem, i < statDisplay.length - 1 && styles.statBorder]}
-            >
-              <Ionicons name={highlights[i].icon} size={20} color={colors.primary} />
-              <Text style={styles.statValue}>{item.value}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Primary actions grid */}
+        {/* Quick Access */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>QUICK ACCESS</Text>
           <View style={styles.actionGrid}>
@@ -171,76 +200,58 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Featured promo */}
+        {/* Single product rail */}
         <View style={styles.section}>
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onPress={() => navigation.navigate('StringingForm')}
-          >
-            <LinearGradient
-              colors={['#064E3B', '#059669', '#10B981']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.promoCard}
-            >
-              <View style={styles.promoDecor}>
-                <MaterialCommunityIcons name="badminton" size={120} color="rgba(255,255,255,0.06)" />
-              </View>
-              <View style={styles.promoBadge}>
-                <Text style={styles.promoBadgeText}>⚡ Most Popular</Text>
-              </View>
-              <Text style={styles.promoTitle}>Expert Badminton{'\n'}Stringing Service</Text>
-              <Text style={styles.promoDesc}>
-                Electronic tensioning · Original Yonex strings · Ready in 25–30 mins
-              </Text>
-              <View style={styles.promoFooter}>
-                <Text style={styles.promoCta}>Book online</Text>
-                <View style={styles.promoArrow}>
-                  <Ionicons name="arrow-forward" size={16} color="#059669" />
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          <ProductRail
+            label="HOT DEALS"
+            title="English Willow bats"
+            products={bestsellers}
+            loading={picksLoading}
+            onPressProduct={openProduct}
+            headerActionLabel="Browse all →"
+            onHeaderAction={openCricketBats}
+            emptyText="Bats will appear here once the catalogue loads"
+          />
         </View>
 
-        {/* Categories */}
+        {/* Compact categories */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <View>
               <Text style={styles.sectionLabel}>COLLECTIONS</Text>
               <Text style={styles.sectionTitle}>Shop by Category</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Products')}>
+            <TouchableOpacity onPress={() => navigateToTab(navigation, 'Products')}>
               <Text style={styles.seeAll}>See all →</Text>
             </TouchableOpacity>
           </View>
 
-          {productCategories.map((category) => (
-            <CategoryRow
+          {HOME_CATEGORIES.map((category) => (
+            <CategoryCard
               key={category.id}
               title={category.title}
               description={category.description}
               icon={category.icon}
               gradient={category.gradient}
-              itemCount={category.items.length}
+              image={category.image}
               onPress={() => navigateToCategory(navigation, category.id)}
             />
           ))}
         </View>
 
-        {/* Services */}
+        {/* Top services */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <View>
               <Text style={styles.sectionLabel}>SERVICES</Text>
               <Text style={styles.sectionTitle}>Equipment Care</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Services')}>
+            <TouchableOpacity onPress={() => navigateToTab(navigation, 'Services')}>
               <Text style={styles.seeAll}>See all →</Text>
             </TouchableOpacity>
           </View>
 
-          {services.map((service) => (
+          {HOME_SERVICES.map((service) => (
             <ServiceRow
               key={service.id}
               service={service}
@@ -253,28 +264,46 @@ export function HomeScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* WhatsApp CTA */}
+        {/* Visit store + WhatsApp / Call */}
         <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.whatsappCard}
-            onPress={() => openWhatsApp()}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={['rgba(37,211,102,0.15)', 'rgba(37,211,102,0.05)']}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.whatsappIcon}>
-              <Ionicons name="logo-whatsapp" size={28} color={colors.whatsapp} />
+          <View style={styles.trustCard}>
+            <TouchableOpacity
+              style={styles.trustMain}
+              onPress={() => navigateToTab(navigation, 'Contact')}
+              activeOpacity={0.85}
+            >
+              <View style={styles.trustIcon}>
+                <Ionicons name="storefront-outline" size={22} color={colors.primary} />
+              </View>
+              <View style={styles.trustCopy}>
+                <Text style={styles.trustTitle}>Visit our store</Text>
+                <Text style={styles.trustSub} numberOfLines={2}>
+                  {contact.address}
+                </Text>
+                <Text style={styles.trustHours}>{contact.hours}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.trustActions}>
+              <TouchableOpacity
+                style={styles.trustActionBtn}
+                onPress={() => openWhatsApp()}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color={colors.whatsapp} />
+                <Text style={styles.trustActionText}>WhatsApp</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.trustActionBtn}
+                onPress={() => openPhone()}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="call-outline" size={18} color={colors.primary} />
+                <Text style={styles.trustActionText}>Call</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.whatsappContent}>
-              <Text style={styles.whatsappTitle}>Need help choosing?</Text>
-              <Text style={styles.whatsappSub}>
-                Chat with our experts on WhatsApp for instant advice
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.whatsapp} />
-          </TouchableOpacity>
+          </View>
         </View>
 
         <AppFooter />
@@ -292,104 +321,59 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   heroSection: {
-    minHeight: 220,
+    minHeight: 320,
     overflow: 'hidden',
     marginBottom: spacing.lg,
+    justifyContent: 'flex-end',
   },
-  heroOrb1: {
-    position: 'absolute',
-    top: -60,
-    right: -40,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-  },
-  heroOrb2: {
-    position: 'absolute',
-    bottom: 20,
-    left: -80,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+  heroImage: {
+    ...StyleSheet.absoluteFill,
+    width: SCREEN_WIDTH,
+    height: '100%',
   },
   heroInner: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  pill: {
+  heroBrandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.25)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    marginBottom: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.sm,
   },
-  pillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-  },
-  pillText: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  heroTitle: {
+  heroBrand: {
     ...typography.hero,
     color: colors.text,
-    marginBottom: spacing.md,
+    letterSpacing: 0.5,
+    flexShrink: 1,
   },
-  heroAccent: {
-    color: colors.primary,
+  heroLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#fff',
   },
   heroSub: {
     ...typography.body,
     color: colors.textSecondary,
     lineHeight: 24,
-    maxWidth: SCREEN_WIDTH * 0.85,
+    maxWidth: SCREEN_WIDTH * 0.88,
+    marginBottom: spacing.lg,
   },
-  statsCard: {
+  heroCta: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: -spacing.xl,
-    marginBottom: spacing.xl,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    paddingVertical: spacing.md,
-    ...shadows.card,
-  },
-  statItem: {
-    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-    gap: 4,
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md - 2,
+    borderRadius: radius.md,
   },
-  statBorder: {
-    borderRightWidth: 1,
-    borderRightColor: colors.borderLight,
-  },
-  statValue: {
-    fontSize: 15,
+  heroCtaText: {
+    ...typography.bodySmall,
+    color: colors.background,
     fontWeight: '800',
-    color: colors.text,
-    marginTop: 2,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 13,
   },
   section: {
     paddingHorizontal: spacing.lg,
@@ -420,94 +404,63 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  promoCard: {
+  trustCard: {
+    backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
-    minHeight: 200,
-    ...shadows.card,
   },
-  promoDecor: {
-    position: 'absolute',
-    right: -20,
-    bottom: -20,
-  },
-  promoBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    marginBottom: spacing.md,
-  },
-  promoBadgeText: {
-    ...typography.caption,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  promoTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.white,
-    lineHeight: 30,
-    marginBottom: spacing.sm,
-  },
-  promoDesc: {
-    ...typography.bodySmall,
-    color: 'rgba(255,255,255,0.85)',
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-    maxWidth: '80%',
-  },
-  promoFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  promoCta: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  promoArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  whatsappCard: {
+  trustMain: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(37, 211, 102, 0.25)',
-    overflow: 'hidden',
   },
-  whatsappIcon: {
-    width: 52,
-    height: 52,
+  trustIcon: {
+    width: 48,
+    height: 48,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(37, 211, 102, 0.12)',
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  whatsappContent: {
+  trustCopy: {
     flex: 1,
   },
-  whatsappTitle: {
+  trustTitle: {
     ...typography.body,
     color: colors.text,
     fontWeight: '700',
     marginBottom: 2,
   },
-  whatsappSub: {
+  trustSub: {
     ...typography.caption,
     color: colors.textSecondary,
-    lineHeight: 17,
+    lineHeight: 16,
+  },
+  trustHours: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  trustActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  trustActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  trustActionText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '700',
   },
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { StepIndicator } from '../components/StepIndicator';
 import { TextField } from '../components/TextField';
@@ -20,7 +21,8 @@ import { OptionPickerModal } from '../components/OptionPickerModal';
 import { StringSpecsModal } from '../components/StringSpecsModal';
 import { Button } from '../components/Button';
 import { createStringingOrder, verifyPayment, SHOP_ID } from '../services/paymentsApi';
-import { runZohoUpiCheckout } from '../services/zohoPayments';
+// Zoho native UPI disabled for localhost / web dev.
+// import { runZohoUpiCheckout } from '../services/zohoPayments';
 import {
   formSteps,
   stringOptions,
@@ -36,7 +38,11 @@ import {
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { openWhatsApp } from '../utils/linking';
 import { generateBookingId } from '../utils/booking';
+import { getProfileFormPrefill } from '../utils/profilePrefill';
+import { navigateToBookingSuccess } from '../utils/navHelpers';
+import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/types';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StringingForm'>;
 
@@ -54,11 +60,19 @@ type FormErrors = {
 };
 
 export function StringingFormScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const prefill = getProfileFormPrefill(user);
+  const appliedUserId = useRef<string | null>(null);
+
   const [step, setStep] = useState(0);
   const [rackets, setRackets] = useState<RacketFormEntry[]>([createEmptyRacket()]);
-  const [whatsapp, setWhatsapp] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [locationId, setLocationId] = useState(storeLocations[0].id);
+  const [whatsapp, setWhatsapp] = useState(prefill?.phone ?? '');
+  const [fullName, setFullName] = useState(prefill?.fullName ?? '');
+  const [locationId, setLocationId] = useState(
+    prefill?.preferredStoreId && storeLocations.some((l) => l.id === prefill.preferredStoreId)
+      ? prefill.preferredStoreId
+      : storeLocations[0].id,
+  );
   const [express, setExpress] = useState(false);
   const [pickupDrop, setPickupDrop] = useState(false);
   const [couponCode, setCouponCode] = useState('');
@@ -72,7 +86,37 @@ export function StringingFormScreen({ navigation }: Props) {
   const totals = calculateOrderTotal(rackets, express);
   const selectedLocation = storeLocations.find((l) => l.id === locationId);
   const phoneDigits = whatsapp.replace(/\D/g, '').slice(-10);
-  const customerEmail = `${phoneDigits}@dasportz.com`;
+  const customerEmail = getProfileFormPrefill(user)?.email || `${phoneDigits}@dasportz.com`;
+
+  const applyProfilePrefill = useCallback(() => {
+    const p = getProfileFormPrefill(user);
+    if (!p || !user) return;
+
+    const firstApply = appliedUserId.current !== user.id;
+    appliedUserId.current = user.id;
+
+    if (firstApply) {
+      setFullName(p.fullName);
+      setWhatsapp(p.phone);
+      if (p.preferredStoreId && storeLocations.some((l) => l.id === p.preferredStoreId)) {
+        setLocationId(p.preferredStoreId);
+      }
+      return;
+    }
+
+    setFullName((prev) => prev.trim() || p.fullName);
+    setWhatsapp((prev) => prev.replace(/\D/g, '') || p.phone);
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      applyProfilePrefill();
+    }, [applyProfilePrefill]),
+  );
+
+  useEffect(() => {
+    applyProfilePrefill();
+  }, [applyProfilePrefill]);
 
   function updateRacket(id: string, updates: Partial<RacketFormEntry>) {
     setRackets((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
@@ -187,11 +231,12 @@ export function StringingFormScreen({ navigation }: Props) {
     amount: number,
     method: 'cash' | 'upi',
   ) {
-    navigation.replace('BookingSuccess', {
+    navigateToBookingSuccess(navigation, {
       kind: 'service',
       amount: formatPrice(amount),
       orderId,
       customerName: fullName.trim(),
+      customerPhone: phoneDigits,
       paymentMethod: method,
       details: [
         { label: 'Service', value: 'Badminton Stringing' },
@@ -249,6 +294,13 @@ export function StringingFormScreen({ navigation }: Props) {
       const { order_id: orderId, amount, payments_session_id: sessionId } = response.data;
       setSubmitting(false);
 
+      // Zoho native UPI disabled — skip payment on web for local testing.
+      if (Platform.OS === 'web') {
+        navigateToSuccess(orderId, Number(amount), 'upi');
+        return;
+      }
+
+      /*
       const checkout = await runZohoUpiCheckout({
         paymentSessionId: sessionId,
         description: `Stringing order ${orderId}`,
@@ -264,7 +316,9 @@ export function StringingFormScreen({ navigation }: Props) {
       if (!verified.success) {
         throw new Error(verified.message ?? 'Payment verification failed');
       }
-      navigateToSuccess(orderId, Number(amount), 'upi');
+      */
+      void sessionId;
+      throw new Error('UPI payments are disabled. Use cash checkout for local testing.');
     } catch (err) {
       Alert.alert(
         'Checkout Failed',
@@ -407,7 +461,11 @@ export function StringingFormScreen({ navigation }: Props) {
         {step === 1 ? (
           <View>
             <Text style={styles.heading}>Your Details</Text>
-            <Text style={styles.subheading}>To send you live status updates</Text>
+            <Text style={styles.subheading}>
+              {user
+                ? 'Prefilled from your profile — edit if needed'
+                : 'To send you live status updates'}
+            </Text>
 
             <TextField
               label="WhatsApp Number"
@@ -507,7 +565,8 @@ export function StringingFormScreen({ navigation }: Props) {
                   placeholder="Coupon code"
                   value={couponCode}
                   onChangeText={setCouponCode}
-                  style={styles.couponInput}
+                  autoCapitalize="characters"
+                  containerStyle={styles.couponField}
                 />
                 <TouchableOpacity style={styles.applyBtn} onPress={applyCoupon}>
                   <Text style={styles.applyText}>Apply</Text>
@@ -831,13 +890,15 @@ const styles = StyleSheet.create({
   },
   couponRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.md,
     marginBottom: spacing.md,
   },
-  couponInput: {
+  couponField: {
     flex: 1,
+    minWidth: 0,
+    marginBottom: 0,
   },
   applyBtn: {
     backgroundColor: colors.surfaceLight,
@@ -846,14 +907,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.md,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
   },
   applyText: {
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: '700',
-  },
-  totalRow: {
+  },  totalRow: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.md,

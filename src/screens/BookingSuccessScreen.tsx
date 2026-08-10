@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,18 @@ import {
   Easing,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography, radius } from '../constants/theme';
+import { downloadInvoicePdf } from '../utils/invoicePdf';
+import { useNotifications } from '../context/NotificationContext';
+import { notifyOrderConfirmation } from '../services/orderConfirmation';
+import { savePastOrder } from '../services/orderHistory';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BookingSuccess'>;
@@ -67,9 +73,13 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
     amount,
     orderId,
     customerName,
+    customerPhone,
     paymentMethod,
     details = [],
   } = route.params;
+
+  const { addNotification } = useNotifications();
+  const confirmationSent = useRef(false);
 
   const copy = getSuccessCopy(kind, paymentMethod, customerName);
 
@@ -85,6 +95,7 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
   const isCash = paymentMethod === 'cash';
   const themeColor = isCash ? BLUE : GREEN;
   const themeColorDark = isCash ? BLUE_DARK : GREEN_DARK;
+  const [downloading, setDownloading] = useState(false);
 
   const circleColor = colorAnim.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
@@ -105,6 +116,65 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
     inputRange: [0, 0.5, 1],
     outputRange: [0.35, 0.85, 0.35],
   });
+
+  useEffect(() => {
+    if (confirmationSent.current) return;
+    confirmationSent.current = true;
+
+    const invoiceData = {
+      kind,
+      amount,
+      orderId,
+      customerName,
+      paymentMethod,
+      details,
+    };
+
+    const isCash = paymentMethod === 'cash';
+    const title = isCash
+      ? kind === 'service'
+        ? 'Booking reserved'
+        : 'Order placed'
+      : kind === 'service'
+        ? 'Booking confirmed'
+        : 'Order confirmed';
+
+    const body = isCash
+      ? `${orderId} · ${amount} · Pay at store on visit`
+      : `${orderId} · ${amount} · Payment received via UPI`;
+
+    void addNotification({
+      type: isCash ? 'order' : 'payment',
+      title,
+      body,
+      orderId,
+      amount,
+      paymentMethod,
+    });
+
+    void savePastOrder({
+      id: `po_${orderId}`,
+      orderId,
+      phone: customerPhone,
+      kind,
+      amount,
+      paymentMethod,
+      customerName,
+      details,
+      createdAt: new Date().toISOString(),
+    });
+
+    void notifyOrderConfirmation(invoiceData, customerPhone);
+  }, [
+    addNotification,
+    amount,
+    customerName,
+    customerPhone,
+    details,
+    kind,
+    orderId,
+    paymentMethod,
+  ]);
 
   useEffect(() => {
     const entrance = Animated.sequence([
@@ -181,8 +251,30 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
   function goHome() {
     navigation.reset({
       index: 0,
-      routes: [{ name: 'MainTabs', params: { screen: 'Home' } }],
+      routes: [{ name: 'MainTabs', params: { screen: 'Home', params: { screen: 'HomeMain' } } }],
     });
+  }
+
+  async function handleDownloadInvoice() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadInvoicePdf({
+        kind,
+        orderId,
+        customerName,
+        amount,
+        paymentMethod,
+        details,
+      });
+    } catch (err) {
+      Alert.alert(
+        'Download failed',
+        err instanceof Error ? err.message : 'Could not generate invoice PDF. Please try again.',
+      );
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const summaryRows = [
@@ -297,6 +389,22 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
       </ScrollView>
 
       <Animated.View style={[styles.footer, { opacity: contentOpacity }]}>
+        <TouchableOpacity
+          style={[styles.invoiceBtn, { borderColor: themeColor }]}
+          onPress={handleDownloadInvoice}
+          activeOpacity={0.85}
+          disabled={downloading}
+        >
+          {downloading ? (
+            <ActivityIndicator size="small" color={themeColor} />
+          ) : (
+            <>
+              <Ionicons name="download-outline" size={20} color={themeColor} />
+              <Text style={[styles.invoiceText, { color: themeColor }]}>Download Invoice (PDF)</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.doneBtn} onPress={goHome} activeOpacity={0.9}>
           <LinearGradient
             colors={[themeColor, themeColorDark]}
@@ -491,6 +599,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
+    gap: spacing.sm,
+  },
+  invoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+  },
+  invoiceText: {
+    ...typography.body,
+    fontWeight: '700',
   },
   doneBtn: { borderRadius: radius.md, overflow: 'hidden' },
   doneGradient: {

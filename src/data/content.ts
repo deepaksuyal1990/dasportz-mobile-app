@@ -33,6 +33,7 @@ export type ProductCategory = {
   description: string;
   icon: 'baseball' | 'trophy' | 'speedometer';
   gradient: [string, string];
+  image: number;
   items: ProductItem[];
 };
 
@@ -52,6 +53,7 @@ export const productCategories: ProductCategory[] = [
       'Official SG, SS & DSC English Willow bats, match balls, and protective equipment.',
     icon: 'baseball',
     gradient: ['#14532D', '#22C55E'],
+    image: require('../../assets/quick-access/shop.jpg'),
     items: [
       {
         id: 'sg-bat',
@@ -101,6 +103,7 @@ export const productCategories: ProductCategory[] = [
     description: 'Premium trophies for tournaments and events.',
     icon: 'trophy',
     gradient: ['#78350F', '#F59E0B'],
+    image: require('../../assets/quick-access/store.jpg'),
     items: [
       {
         id: 'tournament-trophy',
@@ -129,6 +132,7 @@ export const productCategories: ProductCategory[] = [
       'Professional cricket bowling machines for training and practice. All three variants available.',
     icon: 'speedometer',
     gradient: ['#1E3A8A', '#3B82F6'],
+    image: require('../../assets/quick-access/bowling-machine.jpg'),
     items: [
       {
         id: 'freebowler-standard',
@@ -152,6 +156,10 @@ export const productCategories: ProductCategory[] = [
   },
 ];
 
+export type ServiceIcon =
+  | { set: 'material'; name: 'badminton' | 'cricket' | 'boxing-glove' | 'baseball-bat' }
+  | { set: 'ionicons'; name: 'baseball' | 'tennisball' | 'construct' | 'hand-left' };
+
 export type Service = {
   id: string;
   title: string;
@@ -160,7 +168,8 @@ export type Service = {
   pickup: boolean;
   description: string;
   features: string[];
-  icon: 'tennisball' | 'hammer' | 'hand-left' | 'construct';
+  icon: ServiceIcon;
+  image: number;
   gradient: [string, string];
 };
 
@@ -174,7 +183,8 @@ export const services: Service[] = [
     description:
       'Professional stringing service with precision electronic tensioning for peak performance.',
     features: ['Precision Tensioning', 'Original Yonex Strings'],
-    icon: 'tennisball',
+    icon: { set: 'material', name: 'badminton' },
+    image: require('../../assets/quick-access/stringing.jpg'),
     gradient: ['#065F46', '#10B981'],
   },
   {
@@ -186,7 +196,8 @@ export const services: Service[] = [
     description:
       '10,000+ stroke oiled machine knocking to make your cricket bat match-ready.',
     features: ['10,000+ Strokes', 'Linseed Oil Treatment'],
-    icon: 'hammer',
+    icon: { set: 'material', name: 'cricket' },
+    image: require('../../assets/quick-access/shop.jpg'),
     gradient: ['#7C2D12', '#EA580C'],
   },
   {
@@ -198,7 +209,8 @@ export const services: Service[] = [
     description:
       'Restore your batting gloves with fresh leather palms, padding, and heavy-duty stitching.',
     features: ['Premium Leather Palm', 'Reinforced Stitching', 'Refreshed Padding'],
-    icon: 'hand-left',
+    icon: { set: 'material', name: 'boxing-glove' },
+    image: require('../../assets/quick-access/repairs.jpg'),
     gradient: ['#581C87', '#A855F7'],
   },
   {
@@ -210,7 +222,8 @@ export const services: Service[] = [
     description:
       'Fix handle cracks, toe splinters, face splits, and complete bat refurbishment.',
     features: ['Handle Replacement', 'Crack Binding', 'Full Sand & Polish'],
-    icon: 'construct',
+    icon: { set: 'material', name: 'baseball-bat' },
+    image: require('../../assets/quick-access/store.jpg'),
     gradient: ['#1E3A8A', '#6366F1'],
   },
 ];

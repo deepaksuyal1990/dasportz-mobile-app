@@ -1,14 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius } from '../constants/theme';
+import { ServiceSportIcon } from './ServiceSportIcon';
 import type { Service } from '../data/content';
-
-const iconMap = {
-  tennisball: 'tennisball',
-  hammer: 'hammer',
-  'hand-left': 'hand-left',
-  construct: 'construct',
-} as const;
 
 type Props = {
   service: Service;
@@ -18,9 +13,19 @@ type Props = {
 export function ServiceRow({ service, onPress }: Props) {
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.85}>
-      <View style={[styles.icon, { backgroundColor: `${service.gradient[1]}18` }]}>
-        <Ionicons name={iconMap[service.icon]} size={20} color={service.gradient[1]} />
-      </View>
+      <ImageBackground
+        source={service.image}
+        style={styles.icon}
+        imageStyle={styles.iconImage}
+        resizeMode="cover"
+      >
+        <LinearGradient
+          colors={[`${service.gradient[0]}CC`, `${service.gradient[1]}EE`]}
+          style={styles.iconOverlay}
+        >
+          <ServiceSportIcon icon={service.icon} size={22} color={colors.white} />
+        </LinearGradient>
+      </ImageBackground>
       <View style={styles.content}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{service.title}</Text>
@@ -48,9 +53,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   icon: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  iconImage: {
+    borderRadius: radius.md,
+  },
+  iconOverlay: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

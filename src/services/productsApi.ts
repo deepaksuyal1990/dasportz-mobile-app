@@ -108,21 +108,55 @@ export async function fetchProductById(id: string): Promise<CricketProduct | nul
   return products.find((p) => p.id === id) ?? null;
 }
 
-export function getBatSizes(product: CricketProduct): string[] {
-  const sizes = new Set<string>();
-  const sources = [...product.specifications, product.description];
+/** Normalize a raw Size: value into a short filter/checkout label. */
+function normalizeBatSize(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
 
-  for (const text of sources) {
-    const match = text.match(/Size:\s*([^\n]+)/i);
-    if (match) {
-      match[1]
-        .split(/[,/&]/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .forEach((s) => sizes.add(s));
-    }
+  // Prefer the leading size token before any explanation in parentheses.
+  const beforeParen = value.split('(')[0].trim();
+  const token =
+    beforeParen.match(/^(SH|LH|Harrow)\b/i)?.[1] ??
+    beforeParen.match(/^Full[- ]?Size\b/i)?.[0] ??
+    beforeParen.match(/^(?:Size\s*)?(\d+)\b/i)?.[1] ??
+    null;
+
+  if (!token) {
+    // Fall back to the short phrase before punctuation, if it looks like a size.
+    const fallback = beforeParen.split(/[,/&]/)[0]?.trim();
+    return fallback || null;
   }
 
-  if (sizes.size === 0) sizes.add('SH');
+  if (/^full[- ]?size$/i.test(token)) return 'Full Size';
+  if (/^\d+$/.test(token)) return token;
+  return token.toUpperCase();
+}
+
+/**
+ * Sizes from product specifications only — entries that start with "Size:".
+ * Does not invent sizes from description/marketing copy.
+ */
+export function getBatSizes(product: CricketProduct): string[] {
+  const sizes = new Set<string>();
+
+  for (const raw of product.specifications ?? []) {
+    const text = String(raw).trim();
+    const match = text.match(/^Size:\s*(.+)$/i);
+    if (!match) continue;
+
+    // Allow "Size: SH / 5" style lists, but only from the Size: field.
+    match[1]
+      .split(/[,/&]/)
+      .map((part) => normalizeBatSize(part))
+      .filter((s): s is string => Boolean(s))
+      .forEach((s) => sizes.add(s));
+  }
+
   return Array.from(sizes);
+}
+
+/** Checkout helper — falls back to SH when specs omit Size:. */
+export function getBatSizesForCheckout(product: CricketProduct): string[] {
+  const sizes = getBatSizes(product);
+  return sizes.length > 0 ? sizes : ['SH'];
 }

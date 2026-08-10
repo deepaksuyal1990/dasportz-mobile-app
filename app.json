@@ -10,13 +10,18 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#060D18"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dasportz.app",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["whatsapp", "tel", "mailto", "https"]
+        "LSApplicationQueriesSchemes": [
+          "whatsapp",
+          "tel",
+          "mailto",
+          "https"
+        ]
       }
     },
     "android": {
@@ -35,7 +40,33 @@
     },
     "plugins": [
       "./plugins/withAndroidLinkingQueries.js",
-      "./plugins/withZohoPayments.js"
+      "./plugins/withZohoPayments.js",
+      "./plugins/withFasterAndroidBuilds.js",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "buildArchs": ["arm64-v8a", "armeabi-v7a"],
+            "usePrecompiledHeaders": true,
+            "enablePngCrunchInReleaseBuilds": false
+          }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow DA SPORTZ to use your location to show where you are."
+        }
+      ],
+      "expo-sharing",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow DA SPORTZ to access your photos for your profile picture."
+        }
+      ]
     ]
   }
 }

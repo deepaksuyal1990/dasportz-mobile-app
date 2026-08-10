@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,21 +13,26 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { StepIndicator } from '../components/StepIndicator';
 import { TextField } from '../components/TextField';
 import { SelectField } from '../components/SelectField';
 import { OptionPickerModal } from '../components/OptionPickerModal';
 import { Button } from '../components/Button';
 import { createCricketOrder, verifyPayment, SHOP_ID } from '../services/paymentsApi';
-import { runZohoUpiCheckout } from '../services/zohoPayments';
-import { fetchProductById, getBatSizes } from '../services/productsApi';
+// Zoho native UPI disabled for localhost / web dev.
+// import { runZohoUpiCheckout } from '../services/zohoPayments';
+import { fetchProductById, getBatSizesForCheckout } from '../services/productsApi';
 import { storeLocations } from '../data/stringing';
 import type { CricketProduct } from '../types/product';
 import type { PaymentMethod } from '../data/stringing';
 import { formatPrice } from '../utils/pricing';
+import { getProfileFormPrefill } from '../utils/profilePrefill';
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { openWhatsApp } from '../utils/linking';
 import { generateBookingId } from '../utils/booking';
+import { navigateToBookingSuccess } from '../utils/navHelpers';
+import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/types';
 
 const checkoutSteps = ['Product', 'Details', 'Checkout'] as const;
@@ -35,15 +40,23 @@ const checkoutSteps = ['Product', 'Details', 'Checkout'] as const;
 type Props = NativeStackScreenProps<RootStackParamList, 'CricketCheckout'>;
 
 export function CricketCheckoutScreen({ route, navigation }: Props) {
+  const { user } = useAuth();
+  const prefill = getProfileFormPrefill(user);
+  const appliedUserId = useRef<string | null>(null);
+
   const [step, setStep] = useState(0);
   const [product, setProduct] = useState<CricketProduct | null>(null);
   const [selectedSize, setSelectedSize] = useState('');
   const [sizes, setSizes] = useState<string[]>([]);
-  const [fullName, setFullName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [locationId, setLocationId] = useState(storeLocations[0].id);
+  const [fullName, setFullName] = useState(prefill?.fullName ?? '');
+  const [whatsapp, setWhatsapp] = useState(prefill?.phone ?? '');
+  const [email, setEmail] = useState(prefill?.email ?? '');
+  const [address, setAddress] = useState(prefill?.address ?? '');
+  const [locationId, setLocationId] = useState(
+    prefill?.preferredStoreId && storeLocations.some((l) => l.id === prefill.preferredStoreId)
+      ? prefill.preferredStoreId
+      : storeLocations[0].id,
+  );
   const [knocking, setKnocking] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [showSizePicker, setShowSizePicker] = useState(false);
@@ -54,11 +67,45 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
   const phoneDigits = whatsapp.replace(/\D/g, '').slice(-10);
   const customerEmail = email.trim() || `${phoneDigits}@dasportz.com`;
 
+  const applyProfilePrefill = useCallback(() => {
+    const p = getProfileFormPrefill(user);
+    if (!p || !user) return;
+
+    const firstApply = appliedUserId.current !== user.id;
+    appliedUserId.current = user.id;
+
+    if (firstApply) {
+      setFullName(p.fullName);
+      setWhatsapp(p.phone);
+      setEmail(p.email);
+      setAddress(p.address);
+      if (p.preferredStoreId && storeLocations.some((l) => l.id === p.preferredStoreId)) {
+        setLocationId(p.preferredStoreId);
+      }
+      return;
+    }
+
+    setFullName((prev) => prev.trim() || p.fullName);
+    setWhatsapp((prev) => prev.replace(/\D/g, '') || p.phone);
+    setEmail((prev) => prev.trim() || p.email);
+    setAddress((prev) => prev.trim() || p.address);
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      applyProfilePrefill();
+    }, [applyProfilePrefill]),
+  );
+
+  useEffect(() => {
+    applyProfilePrefill();
+  }, [applyProfilePrefill]);
+
   useEffect(() => {
     fetchProductById(route.params.productId).then((p) => {
       if (!p) return;
       setProduct(p);
-      const batSizes = getBatSizes(p);
+      const batSizes = getBatSizesForCheckout(p);
       setSizes(batSizes);
       setSelectedSize(batSizes[0] ?? 'SH');
     });
@@ -125,11 +172,12 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
     method: 'cash' | 'upi',
   ) {
     if (!product) return;
-    navigation.replace('BookingSuccess', {
+    navigateToBookingSuccess(navigation, {
       kind: 'purchase',
       amount: `₹${Number(amount).toLocaleString('en-IN')}`,
       orderId,
       customerName: fullName.trim(),
+      customerPhone: phoneDigits,
       paymentMethod: method,
       details: [
         { label: 'Product', value: product.title },
@@ -181,6 +229,13 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
       const { order_id: orderId, amount, payments_session_id: sessionId } = response.data;
       setSubmitting(false);
 
+      // Zoho native UPI disabled — skip payment on web for local testing.
+      if (Platform.OS === 'web') {
+        navigateToSuccess(orderId, amount, 'upi');
+        return;
+      }
+
+      /*
       const checkout = await runZohoUpiCheckout({
         paymentSessionId: sessionId,
         description: `Order ${orderId} — ${product.title}`,
@@ -196,7 +251,9 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
       if (!verified.success) {
         throw new Error(verified.message ?? 'Payment verification failed');
       }
-      navigateToSuccess(orderId, amount, 'upi');
+      */
+      void sessionId;
+      throw new Error('UPI payments are disabled. Use cash checkout for local testing.');
     } catch (err) {
       Alert.alert(
         'Checkout Failed',
@@ -273,7 +330,11 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
         {step === 1 ? (
           <View>
             <Text style={styles.heading}>Your Details</Text>
-            <Text style={styles.subheading}>For delivery updates and order confirmation</Text>
+            <Text style={styles.subheading}>
+              {user
+                ? 'Prefilled from your profile — edit if needed'
+                : 'For delivery updates and order confirmation'}
+            </Text>
 
             <TextField
               label="Full Name"

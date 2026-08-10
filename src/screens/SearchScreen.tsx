@@ -9,6 +9,7 @@ import {
   Image,
   ActivityIndicator,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { searchAll, preloadSearchIndex, type SearchResult } from '../services/searchService';
 import { productCategories } from '../data/content';
 import { navigateToCategory } from '../utils/navigation';
+import { navigateToTab } from '../utils/navHelpers';
 import { colors, spacing, typography, radius } from '../constants/theme';
+import { CloseButton } from '../components/CloseButton';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
@@ -85,7 +88,7 @@ export function SearchScreen({ navigation, route }: Props) {
         const parent = productCategories.find((c) => c.items.some((i) => i.id === catalogId));
         if (parent?.id === 'cricket-bats-gear') navigation.navigate('CricketBats');
         else if (parent) navigateToCategory(navigation, parent.id);
-        else navigation.navigate('MainTabs', { screen: 'Products' });
+        else navigateToTab(navigation, 'Products');
         break;
       }
       case 'string':
@@ -127,9 +130,6 @@ export function SearchScreen({ navigation, route }: Props) {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </TouchableOpacity>
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
@@ -151,6 +151,7 @@ export function SearchScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           ) : null}
         </View>
+        <CloseButton />
       </View>
 
       {!indexReady ? (
@@ -169,21 +170,23 @@ export function SearchScreen({ navigation, route }: Props) {
           <Text style={styles.hint}>Try bats, SG, stringing, trophies, or repairs</Text>
         </View>
       ) : !query.trim() ? (
-        <View style={styles.suggestions}>
-          <Text style={styles.suggestLabel}>POPULAR SEARCHES</Text>
-          {['Cricket bats', 'Badminton stringing', 'SG', 'Bat knocking', 'Trophies', 'Freebowler'].map(
-            (term) => (
-              <TouchableOpacity
-                key={term}
-                style={styles.suggestChip}
-                onPress={() => setQuery(term)}
-              >
-                <Ionicons name="search" size={14} color={colors.primary} />
-                <Text style={styles.suggestText}>{term}</Text>
-              </TouchableOpacity>
-            ),
-          )}
-        </View>
+        <ScrollView contentContainerStyle={styles.suggestions} showsVerticalScrollIndicator={false}>
+          <View style={styles.suggestionsInner}>
+            <Text style={styles.suggestLabel}>POPULAR SEARCHES</Text>
+            {['Cricket bats', 'Badminton stringing', 'SG', 'Bat knocking', 'Trophies', 'Freebowler'].map(
+              (term) => (
+                <TouchableOpacity
+                  key={term}
+                  style={styles.suggestChip}
+                  onPress={() => setQuery(term)}
+                >
+                  <Ionicons name="search" size={14} color={colors.primary} />
+                  <Text style={styles.suggestText}>{term}</Text>
+                </TouchableOpacity>
+              ),
+            )}
+          </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={results}
@@ -243,7 +246,8 @@ const styles = StyleSheet.create({
   },
   hint: { ...typography.bodySmall, color: colors.textMuted, textAlign: 'center' },
   emptyTitle: { ...typography.body, color: colors.text, fontWeight: '700', textAlign: 'center' },
-  suggestions: { padding: spacing.lg, gap: spacing.sm },
+  suggestions: { padding: spacing.lg },
+  suggestionsInner: { gap: spacing.sm },
   suggestLabel: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
   suggestChip: {
     flexDirection: 'row',

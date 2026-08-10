@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Invoice DA_1786217668277 — DA SPORTZ</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+      margin: 0;
+      padding: 28px 32px;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .invoice-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding-bottom: 18px;
+      border-bottom: 2px solid #111;
+      margin-bottom: 20px;
+    }
+    .brand-block .brand {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #111;
+      margin-bottom: 4px;
+    }
+    .brand-block .tagline {
+      font-size: 11px;
+      color: #565959;
+      max-width: 280px;
+    }
+    .invoice-meta {
+      text-align: right;
+      min-width: 220px;
+    }
+    .invoice-meta .title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111;
+      margin-bottom: 10px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .meta-row .label { color: #565959; min-width: 88px; text-align: right; }
+    .meta-row .value { color: #111; font-weight: 600; min-width: 120px; text-align: right; }
+    .status-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .status-paid { background: #d5f5e3; color: #067d62; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .info-card {
+      border: 1px solid #d5d9d9;
+      border-radius: 4px;
+      padding: 14px 16px;
+      background: #fafafa;
+    }
+    .info-card h3 {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #565959;
+    }
+    .info-card p {
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: #111;
+    }
+    .info-card .muted { color: #565959; font-size: 11px; }
+    .order-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      background: #f7fafa;
+      border: 1px solid #d5d9d9;
+      border-radius: 4px;
+    }
+    .summary-item .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #565959;
+      margin-bottom: 4px;
+    }
+    .summary-item .value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111;
+    }
+    .section-heading {
+      font-size: 13px;
+      font-weight: 700;
+      color: #111;
+      margin: 0 0 10px;
+    }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+      border: 1px solid #d5d9d9;
+    }
+    table.items thead th {
+      background: #f0f2f2;
+      color: #111;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 10px 12px;
+      border-bottom: 1px solid #d5d9d9;
+      text-align: left;
+    }
+    table.items tbody td {
+      padding: 12px;
+      border-bottom: 1px solid #e7e7e7;
+      vertical-align: top;
+    }
+    table.items tbody tr:last-child td { border-bottom: none; }
+    .col-num { width: 36px; text-align: center; color: #565959; }
+    .col-desc { width: auto; }
+    .col-qty, .col-price, .col-total { width: 90px; text-align: right; white-space: nowrap; }
+    .item-title { font-weight: 700; color: #111; margin-bottom: 4px; }
+    .item-meta { font-size: 11px; color: #565959; }
+    .totals-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 22px;
+    }
+    .totals {
+      width: 280px;
+      border: 1px solid #d5d9d9;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 9px 14px;
+      border-bottom: 1px solid #e7e7e7;
+      font-size: 12px;
+    }
+    .totals-row:last-child { border-bottom: none; }
+    .totals-row .label { color: #565959; }
+    .totals-row .value { font-weight: 600; color: #111; }
+    .totals-row.grand {
+      background: #111;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .totals-row.grand .label,
+    .totals-row.grand .value { color: #fff; }
+    .notes {
+      border-top: 1px solid #d5d9d9;
+      padding-top: 14px;
+      margin-bottom: 14px;
+    }
+    .notes h4 {
+      margin: 0 0 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #565959;
+    }
+    .notes p {
+      margin: 0;
+      font-size: 11px;
+      color: #565959;
+      line-height: 1.55;
+    }
+    .footer {
+      border-top: 1px solid #d5d9d9;
+      padding-top: 12px;
+      font-size: 10px;
+      color: #888;
+      text-align: center;
+      line-height: 1.6;
+    }
+    @media print {
+      body { padding: 16px; }
+      .info-card, .order-summary { break-inside: avoid; }
+      table.items { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-top">
+    <div class="brand-block">
+      <div class="brand">DA SPORTZ</div>
+      <div class="tagline">100% Genuine Sports Equipment &amp; Official Gear</div>
+    </div>
+    <div class="invoice-meta">
+      <div class="title">Tax Invoice</div>
+      <div class="meta-row">
+        <span class="label">Invoice No.</span>
+        <span class="value">INV-DA_1786217668277</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Order ID</span>
+        <span class="value">DA_1786217668277</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Invoice Date</span>
+        <span class="value">9 August 2026 at 2:32 am</span>
+      </div>
+      <span class="status-badge status-paid">Paid</span>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <h3>Sold by</h3>
+      <p><strong>DA SPORTZ</strong></p>
+      <p>Gaur City Sports Complex, Gaur City 1, Greater Noida West</p>
+      <p class="muted">+91 88005 05769</p>
+      <p class="muted">contact@dasportz.com</p>
+      <p class="muted">Mon–Sun, 9am – 9pm</p>
+    </div>
+    <div class="info-card">
+      <h3>Bill to</h3>
+      <p><strong>Rahul Sharma</strong></p>
+      <p class="muted">Pickup / service at: Gaur City 1</p>
+      <p class="muted">Order type: Product order</p>
+    </div>
+  </div>
+
+  <div class="order-summary">
+    <div class="summary-item">
+      <div class="label">Order ID</div>
+      <div class="value">DA_1786217668277</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Order date</div>
+      <div class="value">9 August 2026 at 2:32 am</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Payment method</div>
+      <div class="value">UPI / Online</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Payment status</div>
+      <div class="value">Paid</div>
+    </div>
+  </div>
+
+  <p class="section-heading">Order details</p>
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="col-num">#</th>
+        <th class="col-desc">Description</th>
+        <th class="col-qty">Qty</th>
+        <th class="col-price">Unit price</th>
+        <th class="col-total">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="col-num">1</td>
+          <td class="col-desc">
+            <div class="item-title">SG Sunny Tonny English Willow Cricket Bat</div>
+            <div class="item-meta">Size: SH · Store: Gaur City 1</div>
+          </td>
+          <td class="col-qty">1</td>
+          <td class="col-price">₹4,750.00</td>
+          <td class="col-total">₹4,750.00</td>
+        </tr>
+    </tbody>
+  </table>
+
+  <div class="totals-wrap">
+    <div class="totals">
+      <div class="totals-row">
+        <span class="label">Subtotal</span>
+        <span class="value">₹4,750.00</span>
+      </div>
+      <div class="totals-row">
+        <span class="label">Discount</span>
+        <span class="value">₹0.00</span>
+      </div>
+      <div class="totals-row">
+        <span class="label">Shipping / pickup</span>
+        <span class="value">₹0.00</span>
+      </div>
+      <div class="totals-row grand">
+        <span class="label">Grand total</span>
+        <span class="value">₹4,750</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h4>Important information</h4>
+    <p>
+      Payment has been received successfully. This invoice serves as confirmation of your order. For any queries regarding your order, contact us on WhatsApp or email.
+    </p>
+  </div>
+
+  <div class="footer">
+    DA SPORTZ · Gaur City Sports Complex, Gaur City 1, Greater Noida West · +91 88005 05769<br />
+    https://dasportz.com · Powered by Playnex · Computer-generated invoice, no signature required.
+  </div>
+</body>
+</html>

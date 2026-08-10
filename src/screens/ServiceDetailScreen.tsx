@@ -1,21 +1,15 @@
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
+import { ServiceSportIcon } from '../components/ServiceSportIcon';
 import { services } from '../data/content';
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { openWhatsApp, openPhone } from '../utils/linking';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ServiceDetail'>;
-
-const iconMap = {
-  tennisball: 'tennisball' as const,
-  hammer: 'hammer' as const,
-  'hand-left': 'hand-left' as const,
-  construct: 'construct' as const,
-};
 
 export function ServiceDetailScreen({ route, navigation }: Props) {
   const service = services.find((s) => s.id === route.params.serviceId);
@@ -31,9 +25,19 @@ export function ServiceDetailScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <LinearGradient colors={service.gradient} style={styles.hero}>
+      <ImageBackground source={service.image} style={styles.hero} resizeMode="cover">
+        <LinearGradient
+          colors={['rgba(6,13,24,0.45)', 'rgba(6,13,24,0.92)']}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={[`${service.gradient[0]}99`, `${service.gradient[1]}55`, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={styles.heroIcon}>
-          <Ionicons name={iconMap[service.icon]} size={36} color={colors.white} />
+          <ServiceSportIcon icon={service.icon} size={36} color={colors.white} />
         </View>
         <View style={styles.badgeRow}>
           <View style={styles.badge}>
@@ -48,7 +52,7 @@ export function ServiceDetailScreen({ route, navigation }: Props) {
         </View>
         <Text style={styles.heroTitle}>{service.title}</Text>
         <Text style={styles.turnaround}>{service.turnaround}</Text>
-      </LinearGradient>
+      </ImageBackground>
 
       <View style={styles.content}>
         <Text style={styles.description}>{service.description}</Text>
@@ -106,15 +110,19 @@ const styles = StyleSheet.create({
   hero: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
+    minHeight: 240,
+    justifyContent: 'flex-end',
   },
   heroIcon: {
     width: 64,
     height: 64,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   badgeRow: {
     flexDirection: 'row',

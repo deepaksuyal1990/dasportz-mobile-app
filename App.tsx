@@ -1,18 +1,35 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
-import { initZohoPayments } from './src/services/zohoPayments';
+import { NotificationProvider } from './src/context/NotificationContext';
+import { AuthProvider } from './src/context/AuthContext';
+import { StartupSplash } from './src/components/StartupSplash';
+import { ensureNotificationPermissions } from './src/services/localNotifications';
+// Zoho native SDK disabled for localhost / web dev.
+// import { initZohoPayments } from './src/services/zohoPayments';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   useEffect(() => {
-    initZohoPayments();
+    // initZohoPayments();
+    void ensureNotificationPermissions();
+  }, []);
+
+  const finishSplash = useCallback(() => {
+    setShowSplash(false);
   }, []);
 
   return (
     <SafeAreaProvider>
-      <AppNavigator />
-      <StatusBar style="light" />
+      <AuthProvider>
+        <NotificationProvider>
+          <AppNavigator />
+          <StatusBar style="light" />
+          {showSplash ? <StartupSplash onFinish={finishSplash} /> : null}
+        </NotificationProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

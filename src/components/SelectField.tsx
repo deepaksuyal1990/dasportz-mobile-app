@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius } from '../constants/theme';
 
@@ -9,6 +9,7 @@ type Props = {
   placeholder?: string;
   error?: string;
   onPress: () => void;
+  containerStyle?: StyleProp<ViewStyle>;
 };
 
 export function SelectField({
@@ -18,9 +19,10 @@ export function SelectField({
   placeholder = 'Select...',
   error,
   onPress,
+  containerStyle,
 }: Props) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <Text style={styles.label}>
         {label}
         {required ? <Text style={styles.required}> *</Text> : null}

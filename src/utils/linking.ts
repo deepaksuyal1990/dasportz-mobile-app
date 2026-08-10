@@ -21,24 +21,34 @@ export async function openEmail(subject = 'Enquiry from DA SPORTZ App') {
 export async function openWhatsApp(
   message = 'Hi DA SPORTZ, I would like to enquire about your products and services.',
 ) {
-  const phone = whatsAppPhone();
+  await openWhatsAppToCustomer(contact.phone.replace(/\D/g, '').slice(-10), message);
+}
+
+export async function openWhatsAppToCustomer(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) {
+    Alert.alert('Invalid number', 'A valid customer WhatsApp number is required.');
+    return false;
+  }
+
+  const e164 = `91${digits}`;
   const text = encodeURIComponent(message);
 
   const urls =
     Platform.OS === 'ios'
       ? [
-          `whatsapp://send?phone=${phone}&text=${text}`,
-          `https://wa.me/${phone}?text=${text}`,
+          `whatsapp://send?phone=${e164}&text=${text}`,
+          `https://wa.me/${e164}?text=${text}`,
         ]
       : [
-          `whatsapp://send?phone=${phone}&text=${text}`,
-          `https://api.whatsapp.com/send?phone=${phone}&text=${text}`,
-          `https://wa.me/${phone}?text=${text}`,
+          `whatsapp://send?phone=${e164}&text=${text}`,
+          `https://api.whatsapp.com/send?phone=${e164}&text=${text}`,
+          `https://wa.me/${e164}?text=${text}`,
         ];
 
-  await tryOpenUrls(
+  return tryOpenUrls(
     urls,
-    'Unable to open WhatsApp. Please install WhatsApp or contact us by phone.',
+    'Unable to open WhatsApp. Please install WhatsApp or share the invoice manually.',
   );
 }
 
