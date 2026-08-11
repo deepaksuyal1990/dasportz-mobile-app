@@ -1,5 +1,4 @@
-const API_BASE =
-  'https://kg7kg65ok2hvfox6l4gtniqhsi0ckmox.lambda-url.ap-south-1.on.aws';
+import { getApiBase } from './apiBase';
 
 export const SHOP_ID = 'dasportz';
 
@@ -17,11 +16,13 @@ export type ZpayConfig = {
 
 export type CreateOrderData = {
   payments_session_id: string;
-  amount: string;
+  amount: string | number;
   currency: string;
   order_id: string;
   shopId: string;
   zpayConfig?: ZpayConfig;
+  /** Present for cash / pay-at-outlet when Twilio already messaged the customer. */
+  message?: string;
 };
 
 export type CreateOrderResponse = {
@@ -55,6 +56,10 @@ export type CricketOrderPayload = {
   unlockedPrice: number;
   mrpPrice: number;
   dealToken: string;
+  /** cash / payatoutlet for store payment; omit or upi for Zoho session. */
+  paymentMethod?: 'upi' | 'payatoutlet' | 'cash';
+  testMode?: boolean;
+  notifyCustomer?: boolean;
 };
 
 export type StringingOrderPayload = {
@@ -73,9 +78,10 @@ export type StringingOrderPayload = {
   }>;
   express: boolean;
   _ts: number;
-  paymentMethod: 'upi' | 'payatoutlet';
+  paymentMethod: 'upi' | 'payatoutlet' | 'cash';
   pickupDrop: boolean;
   testMode: boolean;
+  notifyCustomer?: boolean;
   payment: {
     originalAmount: number;
     discount: { couponCode: string | null; couponDiscount: number };
@@ -84,13 +90,21 @@ export type StringingOrderPayload = {
 };
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as T;
   return data;
+}
+
+/** True when PlayNex Lambda already sent the Twilio WhatsApp confirmation. */
+export function wasCustomerNotifiedByBackend(response: CreateOrderResponse): boolean {
+  const session = response.data?.payments_session_id ?? '';
+  const msg = `${response.data?.message ?? ''} ${response.message ?? ''}`.toLowerCase();
+  if (String(session).toUpperCase().startsWith('CASH-')) return true;
+  return msg.includes('customer notified') || msg.includes('notified');
 }
 
 export async function createCricketOrder(
@@ -105,6 +119,12 @@ export async function createStringingOrder(
   return postJson<CreateOrderResponse>('/api/create-order', payload);
 }
 
+/**
+ * After Zoho UPI success — backend verifies payment and sends Twilio WhatsApp.
+ */
 export async function verifyPayment(paymentId: string): Promise<VerifyPaymentResponse> {
   return postJson<VerifyPaymentResponse>('/api/verify-payment', { payment_id: paymentId });
 }
+
+export { getApiBase };
+export { getApiBase as API_BASE };

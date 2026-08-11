@@ -19,7 +19,7 @@ import { TextField } from '../components/TextField';
 import { SelectField } from '../components/SelectField';
 import { OptionPickerModal } from '../components/OptionPickerModal';
 import { Button } from '../components/Button';
-import { createCricketOrder, verifyPayment, SHOP_ID } from '../services/paymentsApi';
+import { createCricketOrder, verifyPayment, SHOP_ID, wasCustomerNotifiedByBackend } from '../services/paymentsApi';
 // Zoho native UPI disabled for localhost / web dev.
 // import { runZohoUpiCheckout } from '../services/zohoPayments';
 import { fetchProductById, getBatSizesForCheckout } from '../services/productsApi';
@@ -30,8 +30,8 @@ import { formatPrice } from '../utils/pricing';
 import { getProfileFormPrefill } from '../utils/profilePrefill';
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { openWhatsApp } from '../utils/linking';
-import { generateBookingId } from '../utils/booking';
 import { navigateToBookingSuccess } from '../utils/navHelpers';
+import { wantsWhatsAppNotifications } from '../utils/notificationPrefs';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -170,6 +170,7 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
     orderId: string,
     amount: string,
     method: 'cash' | 'upi',
+    backendAlreadyNotified = false,
   ) {
     if (!product) return;
     navigateToBookingSuccess(navigation, {
@@ -179,6 +180,7 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
       customerName: fullName.trim(),
       customerPhone: phoneDigits,
       paymentMethod: method,
+      backendAlreadyNotified,
       details: [
         { label: 'Product', value: product.title },
         { label: 'Size', value: selectedSize },
@@ -193,13 +195,10 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
   async function submitOrder() {
     if (!product) return;
 
-    if (paymentMethod === 'cash') {
-      navigateToSuccess(generateBookingId(), String(product.sellingPrice), 'cash');
-      return;
-    }
-
     setSubmitting(true);
     try {
+      const isCash = paymentMethod === 'cash';
+      const allowWhatsApp = wantsWhatsAppNotifications(user);
       const response = await createCricketOrder({
         customerName: fullName.trim(),
         phone: phoneDigits,
@@ -220,6 +219,9 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
         unlockedPrice: product.sellingPrice,
         mrpPrice: product.mrpPrice,
         dealToken: 'STANDARD',
+        paymentMethod: isCash ? 'payatoutlet' : 'upi',
+        notifyCustomer: allowWhatsApp,
+        testMode: false,
       });
 
       if (!response.success || !response.data) {
@@ -227,11 +229,18 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
       }
 
       const { order_id: orderId, amount, payments_session_id: sessionId } = response.data;
+      const notified = allowWhatsApp && wasCustomerNotifiedByBackend(response);
+
+      if (isCash) {
+        navigateToSuccess(orderId, String(amount), 'cash', notified);
+        return;
+      }
+
       setSubmitting(false);
 
       // Zoho native UPI disabled — skip payment on web for local testing.
       if (Platform.OS === 'web') {
-        navigateToSuccess(orderId, amount, 'upi');
+        navigateToSuccess(orderId, String(amount), 'upi', false);
         return;
       }
 
@@ -251,6 +260,8 @@ export function CricketCheckoutScreen({ route, navigation }: Props) {
       if (!verified.success) {
         throw new Error(verified.message ?? 'Payment verification failed');
       }
+      navigateToSuccess(orderId, String(amount), 'upi', true);
+      return;
       */
       void sessionId;
       throw new Error('UPI payments are disabled. Use cash checkout for local testing.');

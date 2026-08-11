@@ -5,6 +5,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { NotificationProvider } from './src/context/NotificationContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { StartupSplash } from './src/components/StartupSplash';
+import { OrderStatusNotifier } from './src/components/OrderStatusNotifier';
 import { ensureNotificationPermissions } from './src/services/localNotifications';
 // Zoho native SDK disabled for localhost / web dev.
 // import { initZohoPayments } from './src/services/zohoPayments';
@@ -25,6 +26,7 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <NotificationProvider>
+          <OrderStatusNotifier />
           <AppNavigator />
           <StatusBar style="light" />
           {showSplash ? <StartupSplash onFinish={finishSplash} /> : null}

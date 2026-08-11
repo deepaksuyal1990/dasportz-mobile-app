@@ -48,6 +48,10 @@ export const storeLocations = [
 
 export const EXPRESS_FEE_PER_RACKET = 20;
 
+/** Test coupon for racket stringing — ₹549 off. */
+export const STRINGING_TEST_COUPON_CODE = 'DAS549';
+export const STRINGING_TEST_COUPON_DISCOUNT = 549;
+
 export const formSteps = ['Rackets', 'Details', 'Checkout'] as const;
 
 export type FormStep = (typeof formSteps)[number];
@@ -83,7 +87,14 @@ export function formatPrice(amount: number) {
 export function calculateOrderTotal(
   rackets: RacketFormEntry[],
   express: boolean,
-): { subtotal: number; expressFee: number; total: number; racketCount: number } {
+  couponDiscount = 0,
+): {
+  subtotal: number;
+  expressFee: number;
+  discount: number;
+  total: number;
+  racketCount: number;
+} {
   const subtotal = rackets.reduce((sum, racket) => {
     const stringOption = getStringById(racket.stringId);
     if (!stringOption) return sum;
@@ -92,6 +103,22 @@ export function calculateOrderTotal(
 
   const racketCount = rackets.reduce((sum, r) => sum + r.quantity, 0);
   const expressFee = express ? racketCount * EXPRESS_FEE_PER_RACKET : 0;
+  const beforeDiscount = subtotal + expressFee;
+  const discount = Math.min(Math.max(0, couponDiscount), beforeDiscount);
 
-  return { subtotal, expressFee, total: subtotal + expressFee, racketCount };
+  return {
+    subtotal,
+    expressFee,
+    discount,
+    total: beforeDiscount - discount,
+    racketCount,
+  };
+}
+
+export function resolveStringingCoupon(code: string): number {
+  const normalized = code.trim().toUpperCase();
+  if (normalized === STRINGING_TEST_COUPON_CODE) {
+    return STRINGING_TEST_COUPON_DISCOUNT;
+  }
+  return 0;
 }

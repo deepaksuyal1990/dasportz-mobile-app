@@ -1,4 +1,5 @@
 import type { InvoiceData } from './invoiceHtml';
+import { contact } from '../data/content';
 
 export function buildOrderThankYouMessage(data: InvoiceData) {
   const firstName = data.customerName.trim().split(' ')[0] || 'there';
@@ -12,9 +13,9 @@ export function buildOrderThankYouMessage(data: InvoiceData) {
     .join('\n');
 
   return [
-    `Hi ${firstName}! 🏸`,
+    `Hi ${firstName},`,
     '',
-    'Thank you for choosing *DA SPORTZ*!',
+    'Thank you for choosing *DA SPORTZ*.',
     '',
     `Your ${data.kind === 'service' ? 'service booking' : 'order'} is confirmed.`,
     '',
@@ -24,11 +25,11 @@ export function buildOrderThankYouMessage(data: InvoiceData) {
     detailLines ? '' : null,
     detailLines || null,
     '',
-    'Your invoice PDF is attached in the next step.',
+    'Your tax invoice PDF is available to download from the order confirmation screen in the DA SPORTZ app.',
     '',
     'Team DA SPORTZ',
     'Gaur City, Greater Noida West',
-    '📞 +91 88005 05769',
+    `📞 ${contact.phoneDisplay}`,
   ]
     .filter((line) => line !== null)
     .join('\n');

@@ -49,7 +49,7 @@ const MENU: MenuItem[] = [
   {
     key: 'orders',
     title: 'Orders',
-    subtitle: 'Past orders & bookings',
+    subtitle: 'Track status & past bookings',
     icon: 'receipt-outline',
     route: 'PastOrders',
   },
@@ -75,7 +75,7 @@ const QUICK_LINKS: Array<{
   icon: keyof typeof Ionicons.glyphMap;
   route: keyof ProfileStackParamList;
 }> = [
-  { key: 'orders', title: 'Orders', icon: 'receipt-outline', route: 'PastOrders' },
+  { key: 'orders', title: 'Track', icon: 'navigate-outline', route: 'PastOrders' },
   { key: 'addresses', title: 'Addresses', icon: 'location-outline', route: 'SavedAddresses' },
   { key: 'prefs', title: 'Alerts', icon: 'notifications-outline', route: 'NotificationPreferences' },
 ];

@@ -23,6 +23,19 @@ export function navigateToBookingSuccess(
   );
 }
 
+/** Open order tracking on the root stack (above tabs). */
+export function navigateToOrderTracking(
+  navigation: NavigationProp<ParamListBase>,
+  orderId: string,
+) {
+  navigation.dispatch(
+    CommonActions.navigate({
+      name: 'OrderTracking',
+      params: { orderId },
+    }),
+  );
+}
+
 /** Jump to a bottom tab from any nested screen. */
 export function navigateToTab(navigation: NavigationProp<ParamListBase>, tab: TabName) {
   if (tab === 'Contact') {

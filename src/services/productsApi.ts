@@ -1,7 +1,7 @@
 import type { CricketProduct } from '../types/product';
 import fallbackData from '../data/cricketProducts.fallback.json';
+import { getApiBase } from './apiBase';
 
-const API_BASE = 'https://kg7kg65ok2hvfox6l4gtniqhsi0ckmox.lambda-url.ap-south-1.on.aws';
 const SHOP_ID = 'dasportz';
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -62,7 +62,7 @@ async function fetchFromApi(): Promise<CricketProduct[]> {
 
   try {
     const res = await fetch(
-      `${API_BASE}/api/products?shopId=${SHOP_ID}&status=live`,
+      `${getApiBase()}/api/products?shopId=${SHOP_ID}&status=live`,
       {
         method: 'GET',
         headers: {

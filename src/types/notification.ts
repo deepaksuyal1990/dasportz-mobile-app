@@ -1,3 +1,5 @@
+import type { OrderTrackingStatus } from '../data/orderTracking';
+
 export type NotificationType = 'order' | 'payment' | 'system';
 
 export type AppNotification = {
@@ -10,4 +12,6 @@ export type AppNotification = {
   orderId?: string;
   amount?: string;
   paymentMethod?: 'cash' | 'upi';
+  /** Present on order status / system updates for color coding. */
+  status?: OrderTrackingStatus;
 };

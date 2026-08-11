@@ -20,6 +20,9 @@ export async function saveNotifications(notifications: AppNotification[]) {
 
 export async function appendNotification(notification: AppNotification) {
   const existing = await loadNotifications();
+  if (existing.some((item) => item.id === notification.id)) {
+    return existing;
+  }
   const next = [notification, ...existing].slice(0, 100);
   await saveNotifications(next);
   return next;
@@ -37,4 +40,16 @@ export async function markAllNotificationsRead() {
   const next = existing.map((item) => ({ ...item, read: true }));
   await saveNotifications(next);
   return next;
+}
+
+export async function deleteNotification(id: string) {
+  const existing = await loadNotifications();
+  const next = existing.filter((item) => item.id !== id);
+  await saveNotifications(next);
+  return next;
+}
+
+export async function clearAllNotifications() {
+  await saveNotifications([]);
+  return [] as AppNotification[];
 }

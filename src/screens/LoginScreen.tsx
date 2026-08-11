@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  View,
   Text,
   StyleSheet,
   ScrollView,
@@ -7,13 +8,16 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { TextField } from '../components/TextField';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
-import { colors, spacing, typography } from '../constants/theme';
+import { colors, spacing, typography, radius } from '../constants/theme';
 import { navigateAfterAuth } from '../utils/navHelpers';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -25,6 +29,7 @@ export function LoginScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showNotFound, setShowNotFound] = useState(false);
 
   async function handleLogin() {
     if (phone.replace(/\D/g, '').length < 10) {
@@ -32,15 +37,28 @@ export function LoginScreen({ navigation }: Props) {
       return;
     }
     setError('');
+    setShowNotFound(false);
     setSubmitting(true);
     try {
       await memberLogin({ phone });
       navigateAfterAuth(navigation);
     } catch (err) {
-      Alert.alert('Login failed', err instanceof Error ? err.message : 'Please try again.');
+      const message = err instanceof Error ? err.message : '';
+      if (message === 'ACCOUNT_NOT_FOUND') {
+        setError('Unable to find any account for this number.');
+        setShowNotFound(true);
+      } else {
+        setError(message || 'Login failed. Please try again.');
+        Alert.alert('Login failed', message || 'Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function goSignUp() {
+    setShowNotFound(false);
+    navigation.navigate('SignUp');
   }
 
   return (
@@ -64,7 +82,11 @@ export function LoginScreen({ navigation }: Props) {
           label="Mobile number"
           required
           value={phone}
-          onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+          onChangeText={(t) => {
+            setPhone(t.replace(/[^0-9]/g, '').slice(0, 10));
+            if (showNotFound) setShowNotFound(false);
+            if (error) setError('');
+          }}
           keyboardType="phone-pad"
           placeholder="10-digit WhatsApp number"
           error={error}
@@ -84,6 +106,30 @@ export function LoginScreen({ navigation }: Props) {
           <Text style={styles.linkMuted}>Continue as guest instead</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={showNotFound}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotFound(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowNotFound(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="person-outline" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.modalTitle}>Unable to find any account</Text>
+            <Text style={styles.modalBody}>
+              We could not find an account for this mobile number. Please sign up to continue.
+            </Text>
+            <Button title="Sign up" onPress={goSignUp} style={styles.modalPrimary} />
+            <TouchableOpacity onPress={() => setShowNotFound(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -112,5 +158,54 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    padding: spacing.lg,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  modalPrimary: {
+    alignSelf: 'stretch',
+  },
+  modalCancel: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  modalCancelText: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    fontWeight: '600',
   },
 });

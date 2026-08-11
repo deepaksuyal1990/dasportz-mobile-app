@@ -20,7 +20,7 @@ import { SelectField } from '../components/SelectField';
 import { OptionPickerModal } from '../components/OptionPickerModal';
 import { StringSpecsModal } from '../components/StringSpecsModal';
 import { Button } from '../components/Button';
-import { createStringingOrder, verifyPayment, SHOP_ID } from '../services/paymentsApi';
+import { createStringingOrder, verifyPayment, SHOP_ID, wasCustomerNotifiedByBackend } from '../services/paymentsApi';
 // Zoho native UPI disabled for localhost / web dev.
 // import { runZohoUpiCheckout } from '../services/zohoPayments';
 import {
@@ -32,14 +32,16 @@ import {
   getStringById,
   formatPrice,
   calculateOrderTotal,
+  resolveStringingCoupon,
+  STRINGING_TEST_COUPON_CODE,
   type RacketFormEntry,
   type PaymentMethod,
 } from '../data/stringing';
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { openWhatsApp } from '../utils/linking';
-import { generateBookingId } from '../utils/booking';
 import { getProfileFormPrefill } from '../utils/profilePrefill';
 import { navigateToBookingSuccess } from '../utils/navHelpers';
+import { wantsWhatsAppNotifications } from '../utils/notificationPrefs';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -77,13 +79,15 @@ export function StringingFormScreen({ navigation }: Props) {
   const [pickupDrop, setPickupDrop] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
+  const [couponError, setCouponError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [showSpecs, setShowSpecs] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const totals = calculateOrderTotal(rackets, express);
+  const couponDiscount = couponApplied ? resolveStringingCoupon(couponCode) : 0;
+  const totals = calculateOrderTotal(rackets, express, couponDiscount);
   const selectedLocation = storeLocations.find((l) => l.id === locationId);
   const phoneDigits = whatsapp.replace(/\D/g, '').slice(-10);
   const customerEmail = getProfileFormPrefill(user)?.email || `${phoneDigits}@dasportz.com`;
@@ -179,12 +183,26 @@ export function StringingFormScreen({ navigation }: Props) {
   }
 
   function applyCoupon() {
-    if (!couponCode.trim()) {
-      Alert.alert('Coupon', 'Please enter a coupon code.');
+    const code = couponCode.trim();
+    if (!code) {
+      setCouponApplied(false);
+      setCouponError('Please enter a coupon code.');
       return;
     }
+    const discount = resolveStringingCoupon(code);
+    if (!discount) {
+      setCouponApplied(false);
+      setCouponError('Invalid coupon code.');
+      Alert.alert('Invalid coupon', 'This coupon code is not valid for racket stringing.');
+      return;
+    }
+    setCouponCode(code.toUpperCase());
     setCouponApplied(true);
-    Alert.alert('Coupon Applied', 'Your coupon will be verified at checkout.');
+    setCouponError('');
+    Alert.alert(
+      'Coupon applied',
+      `${STRINGING_TEST_COUPON_CODE} — ${formatPrice(discount)} off applied to your stringing order.`,
+    );
   }
 
   function buildOrderMessage() {
@@ -216,7 +234,9 @@ export function StringingFormScreen({ navigation }: Props) {
       `Subtotal: ${formatPrice(totals.subtotal)}`,
       express ? `Express (1 Hour): ${formatPrice(totals.expressFee)}` : 'Express: No',
       pickupDrop ? 'Pickup & Drop: Yes (porter charges apply)' : 'Pickup & Drop: No',
-      couponApplied ? `Coupon: ${couponCode}` : '',
+      couponApplied && totals.discount > 0
+        ? `Coupon (${couponCode.toUpperCase()}): -${formatPrice(totals.discount)}`
+        : '',
       `Total: ${formatPrice(totals.total)}`,
       `Payment: ${paymentMethod === 'upi' ? 'UPI / Online' : 'Cash'}`,
       '',
@@ -230,6 +250,7 @@ export function StringingFormScreen({ navigation }: Props) {
     orderId: string,
     amount: number,
     method: 'cash' | 'upi',
+    backendAlreadyNotified = false,
   ) {
     navigateToBookingSuccess(navigation, {
       kind: 'service',
@@ -238,6 +259,7 @@ export function StringingFormScreen({ navigation }: Props) {
       customerName: fullName.trim(),
       customerPhone: phoneDigits,
       paymentMethod: method,
+      backendAlreadyNotified,
       details: [
         { label: 'Service', value: 'Badminton Stringing' },
         { label: 'Rackets', value: String(totals.racketCount) },
@@ -246,18 +268,18 @@ export function StringingFormScreen({ navigation }: Props) {
         ...(method === 'cash'
           ? [{ label: 'Payment', value: 'Cash at store' }]
           : [{ label: 'Payment', value: 'UPI / Online' }]),
+        ...(couponApplied && totals.discount > 0
+          ? [{ label: 'Coupon', value: `${couponCode.toUpperCase()} (−${formatPrice(totals.discount)})` }]
+          : []),
       ],
     });
   }
 
   async function submitOrder() {
-    if (paymentMethod === 'cash') {
-      navigateToSuccess(generateBookingId(), totals.total, 'cash');
-      return;
-    }
-
     setSubmitting(true);
     try {
+      const isCash = paymentMethod === 'cash';
+      const allowWhatsApp = wantsWhatsAppNotifications(user);
       const response = await createStringingOrder({
         customerName: fullName.trim(),
         phone: phoneDigits,
@@ -277,12 +299,16 @@ export function StringingFormScreen({ navigation }: Props) {
         }),
         express,
         _ts: Date.now(),
-        paymentMethod: paymentMethod === 'upi' ? 'upi' : 'payatoutlet',
+        paymentMethod: isCash ? 'payatoutlet' : 'upi',
         pickupDrop,
         testMode: false,
+        notifyCustomer: allowWhatsApp,
         payment: {
-          originalAmount: totals.total,
-          discount: { couponCode: couponApplied ? couponCode.trim() : null, couponDiscount: 0 },
+          originalAmount: totals.subtotal + totals.expressFee,
+          discount: {
+            couponCode: couponApplied && totals.discount > 0 ? couponCode.trim().toUpperCase() : null,
+            couponDiscount: totals.discount,
+          },
           finalAmount: totals.total,
         },
       });
@@ -292,11 +318,20 @@ export function StringingFormScreen({ navigation }: Props) {
       }
 
       const { order_id: orderId, amount, payments_session_id: sessionId } = response.data;
+      const notified = allowWhatsApp && wasCustomerNotifiedByBackend(response);
+      // Prefer our payable total when a test coupon was applied (backend may ignore discount).
+      const payableAmount = totals.discount > 0 ? totals.total : Number(amount);
+
+      if (isCash) {
+        navigateToSuccess(orderId, payableAmount, 'cash', notified);
+        return;
+      }
+
       setSubmitting(false);
 
       // Zoho native UPI disabled — skip payment on web for local testing.
       if (Platform.OS === 'web') {
-        navigateToSuccess(orderId, Number(amount), 'upi');
+        navigateToSuccess(orderId, payableAmount, 'upi', false);
         return;
       }
 
@@ -316,6 +351,8 @@ export function StringingFormScreen({ navigation }: Props) {
       if (!verified.success) {
         throw new Error(verified.message ?? 'Payment verification failed');
       }
+      navigateToSuccess(orderId, Number(amount), 'upi', true);
+      return;
       */
       void sessionId;
       throw new Error('UPI payments are disabled. Use cash checkout for local testing.');
@@ -562,16 +599,30 @@ export function StringingFormScreen({ navigation }: Props) {
               <View style={styles.couponRow}>
                 <TextField
                   label=""
-                  placeholder="Coupon code"
+                  placeholder={`Coupon code`}
                   value={couponCode}
-                  onChangeText={setCouponCode}
+                  onChangeText={(t) => {
+                    setCouponCode(t);
+                    setCouponApplied(false);
+                    setCouponError('');
+                  }}
                   autoCapitalize="characters"
                   containerStyle={styles.couponField}
+                  error={couponError}
                 />
                 <TouchableOpacity style={styles.applyBtn} onPress={applyCoupon}>
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{couponApplied ? 'Applied' : 'Apply'}</Text>
                 </TouchableOpacity>
               </View>
+
+              {totals.discount > 0 ? (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.discountLabel}>
+                    Coupon ({STRINGING_TEST_COUPON_CODE})
+                  </Text>
+                  <Text style={styles.discountValue}>-{formatPrice(totals.discount)}</Text>
+                </View>
+              ) : null}
 
               <View style={[styles.summaryRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
@@ -914,7 +965,17 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: '700',
-  },  totalRow: {
+  },
+  discountLabel: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  discountValue: {
+    ...typography.bodySmall,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  totalRow: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.md,

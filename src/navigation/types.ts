@@ -10,6 +10,8 @@ export type BookingSuccessParams = {
   customerPhone: string;
   paymentMethod: 'cash' | 'upi';
   details?: Array<{ label: string; value: string }>;
+  /** True when PlayNex create-order / verify-payment already sent Twilio WhatsApp. */
+  backendAlreadyNotified?: boolean;
 };
 
 /** Shared screens reachable from Home / Products / Services while keeping the tab bar. */
@@ -65,6 +67,7 @@ export type RootStackParamList = {
   GuestLogin: undefined;
   Login: undefined;
   BookingSuccess: BookingSuccessParams;
+  OrderTracking: { orderId: string };
   // Legacy aliases kept so existing navigate() calls still type-check via RootStack
   Search: { query?: string } | undefined;
   Notifications: undefined;

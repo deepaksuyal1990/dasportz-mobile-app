@@ -1,6 +1,6 @@
 {
   "name": "dasportz-mobile-app",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -38,6 +38,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "proxy": "node scripts/api-proxy.js",
+    "web:dev": "node scripts/api-proxy.js & expo start --web",
     "prebuild": "expo prebuild",
     "build:apk": "node scripts/build-apk.js",
     "build:apk:clean": "node scripts/build-apk.js --clean"

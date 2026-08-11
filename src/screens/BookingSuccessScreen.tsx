@@ -17,8 +17,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography, radius } from '../constants/theme';
 import { downloadInvoicePdf } from '../utils/invoicePdf';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import { notifyOrderConfirmation } from '../services/orderConfirmation';
-import { savePastOrder } from '../services/orderHistory';
+import { getPastOrderById, savePastOrder } from '../services/orderHistory';
+import { wantsWhatsAppNotifications } from '../utils/notificationPrefs';
+import { navigateToOrderTracking } from '../utils/navHelpers';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BookingSuccess'>;
@@ -76,10 +79,13 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
     customerPhone,
     paymentMethod,
     details = [],
+    backendAlreadyNotified = false,
   } = route.params;
 
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const confirmationSent = useRef(false);
+  const allowWhatsApp = wantsWhatsAppNotifications(user);
 
   const copy = getSuccessCopy(kind, paymentMethod, customerName);
 
@@ -162,12 +168,18 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
       customerName,
       details,
       createdAt: new Date().toISOString(),
+      lastNotifiedStatus: 'received',
     });
 
-    void notifyOrderConfirmation(invoiceData, customerPhone);
+    void notifyOrderConfirmation(invoiceData, customerPhone, {
+      backendAlreadyNotified: allowWhatsApp ? backendAlreadyNotified : false,
+      allowWhatsApp,
+    });
   }, [
     addNotification,
+    allowWhatsApp,
     amount,
+    backendAlreadyNotified,
     customerName,
     customerPhone,
     details,
@@ -253,6 +265,25 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
       index: 0,
       routes: [{ name: 'MainTabs', params: { screen: 'Home', params: { screen: 'HomeMain' } } }],
     });
+  }
+
+  async function handleTrackOrder() {
+    const existing = await getPastOrderById(orderId);
+    if (!existing) {
+      await savePastOrder({
+        id: `po_${orderId}`,
+        orderId,
+        phone: customerPhone,
+        kind,
+        amount,
+        paymentMethod,
+        customerName,
+        details,
+        createdAt: new Date().toISOString(),
+        lastNotifiedStatus: 'received',
+      });
+    }
+    navigateToOrderTracking(navigation, orderId);
   }
 
   async function handleDownloadInvoice() {
@@ -400,9 +431,22 @@ export function BookingSuccessScreen({ route, navigation }: Props) {
           ) : (
             <>
               <Ionicons name="download-outline" size={20} color={themeColor} />
-              <Text style={[styles.invoiceText, { color: themeColor }]}>Download Invoice (PDF)</Text>
+              <Text style={[styles.invoiceText, { color: themeColor }]}>
+                {downloading ? 'Saving invoice…' : 'Download Invoice (PDF)'}
+              </Text>
             </>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.trackBtn, { borderColor: themeColor }]}
+          onPress={() => {
+            void handleTrackOrder();
+          }}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="navigate-circle-outline" size={20} color={themeColor} />
+          <Text style={[styles.invoiceText, { color: themeColor }]}>Track order status</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.doneBtn} onPress={goHome} activeOpacity={0.9}>
@@ -602,6 +646,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   invoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+  },
+  trackBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

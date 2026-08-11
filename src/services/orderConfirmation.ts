@@ -1,39 +1,23 @@
-import { Platform } from 'react-native';
-import * as Sharing from 'expo-sharing';
-import { buildOrderThankYouMessage } from '../utils/orderThankYou';
-import { createInvoicePdfUri, type InvoiceData } from '../utils/invoicePdf';
-import { openWhatsAppToCustomer } from '../utils/linking';
+import type { InvoiceData } from '../utils/invoicePdf';
 import { showOrderNotification } from './localNotifications';
+import { requestTwilioOrderNotify } from './twilioNotify';
 
-export async function sendOrderConfirmationWhatsApp(
-  customerPhone: string,
-  invoiceData: InvoiceData,
-) {
-  const message = buildOrderThankYouMessage(invoiceData);
-
-  if (Platform.OS === 'web') {
-    await openWhatsAppToCustomer(customerPhone, message);
-    return;
-  }
-
-  const pdfUri = await createInvoicePdfUri(invoiceData);
-  await openWhatsAppToCustomer(customerPhone, message);
-
-  // WhatsApp deep links cannot attach files — open share sheet for the PDF right after.
-  await new Promise((resolve) => setTimeout(resolve, 900));
-
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(pdfUri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Attach invoice ${invoiceData.orderId}`,
-      UTI: 'com.adobe.pdf',
-    });
-  }
-}
-
+/**
+ * Local notification + Twilio WhatsApp via PlayNex backend (when allowed).
+ * Does not open the WhatsApp app.
+ *
+ * WhatsApp is skipped when the user turned off WhatsApp in notification preferences.
+ * Prefer passing notifyCustomer: false on create-order in that case so the backend
+ * does not message them either.
+ */
 export async function notifyOrderConfirmation(
   invoiceData: InvoiceData,
   customerPhone: string,
+  options?: {
+    backendAlreadyNotified?: boolean;
+    /** When false, skip Twilio / backend WhatsApp entirely. Defaults to true. */
+    allowWhatsApp?: boolean;
+  },
 ) {
   const isCash = invoiceData.paymentMethod === 'cash';
   const title = isCash
@@ -54,9 +38,22 @@ export async function notifyOrderConfirmation(
     orderId: invoiceData.orderId,
   });
 
+  const allowWhatsApp = options?.allowWhatsApp !== false;
+  if (!allowWhatsApp) {
+    console.log('[OrderConfirmation] WhatsApp skipped — preference is off');
+    return;
+  }
+
   try {
-    await sendOrderConfirmationWhatsApp(customerPhone, invoiceData);
-  } catch {
-    // WhatsApp/share may be cancelled by the user — order still succeeded.
+    const result = await requestTwilioOrderNotify({
+      customerPhone,
+      invoiceData,
+      alreadyNotified: options?.backendAlreadyNotified,
+    });
+    if (!result.ok && !result.alreadyHandled) {
+      console.warn('[OrderConfirmation] Twilio backend notify:', result.message);
+    }
+  } catch (err) {
+    console.warn('[OrderConfirmation] Twilio backend notify failed:', err);
   }
 }

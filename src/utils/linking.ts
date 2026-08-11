@@ -1,12 +1,36 @@
 import { Linking, Alert, Platform } from 'react-native';
 import { contact } from '../data/content';
 
-function whatsAppPhone(): string {
-  return contact.phone.replace(/\D/g, '');
+/** Normalize to Indian E.164 digits without +: 91XXXXXXXXXX */
+export function toWhatsAppE164(phone: string, defaultCountryCode = '91'): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return null;
+
+  // Already includes country code (12+ digits starting with 91)
+  if (digits.length >= 12 && digits.startsWith(defaultCountryCode)) {
+    return digits.slice(0, 12);
+  }
+
+  // 10-digit Indian mobile
+  const local = digits.slice(-10);
+  if (local.length === 10 && /^[6-9]\d{9}$/.test(local)) {
+    return `${defaultCountryCode}${local}`;
+  }
+
+  // Other international: keep as-is if long enough
+  if (digits.length >= 10 && digits.length <= 15) {
+    return digits;
+  }
+
+  return null;
+}
+
+function storeWhatsAppE164(): string {
+  return toWhatsAppE164(contact.phone) ?? contact.phone.replace(/\D/g, '');
 }
 
 export async function openPhone() {
-  const digits = whatsAppPhone();
+  const digits = storeWhatsAppE164();
   await tryOpenUrls(
     [`tel:${contact.phone}`, `tel:+${digits}`, `tel:${digits}`],
     'Unable to open phone dialer.',
@@ -18,22 +42,28 @@ export async function openEmail(subject = 'Enquiry from DA SPORTZ App') {
   await tryOpenUrls([url], 'Unable to open email app.');
 }
 
+/** Opens WhatsApp chat with the DA SPORTZ store number. */
 export async function openWhatsApp(
   message = 'Hi DA SPORTZ, I would like to enquire about your products and services.',
 ) {
-  await openWhatsAppToCustomer(contact.phone.replace(/\D/g, '').slice(-10), message);
+  return openWhatsAppChat(storeWhatsAppE164(), message);
 }
 
+/**
+ * Opens WhatsApp chat with a customer's real mobile number
+ * (uses +91 for 10-digit Indian numbers).
+ */
 export async function openWhatsAppToCustomer(phone: string, message: string) {
-  const digits = phone.replace(/\D/g, '').slice(-10);
-  if (digits.length < 10) {
+  const e164 = toWhatsAppE164(phone);
+  if (!e164) {
     Alert.alert('Invalid number', 'A valid customer WhatsApp number is required.');
     return false;
   }
+  return openWhatsAppChat(e164, message);
+}
 
-  const e164 = `91${digits}`;
+async function openWhatsAppChat(e164: string, message: string) {
   const text = encodeURIComponent(message);
-
   const urls =
     Platform.OS === 'ios'
       ? [
@@ -48,7 +78,7 @@ export async function openWhatsAppToCustomer(phone: string, message: string) {
 
   return tryOpenUrls(
     urls,
-    'Unable to open WhatsApp. Please install WhatsApp or share the invoice manually.',
+    'Unable to open WhatsApp. Please install WhatsApp and try again.',
   );
 }
 
@@ -72,6 +102,10 @@ export async function openWebsite() {
 async function tryOpenUrls(urls: string[], errorMessage: string): Promise<boolean> {
   for (const url of urls) {
     try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported && url.startsWith('whatsapp://')) {
+        continue;
+      }
       await Linking.openURL(url);
       return true;
     } catch {

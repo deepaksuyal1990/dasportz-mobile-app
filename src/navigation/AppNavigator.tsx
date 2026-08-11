@@ -16,6 +16,7 @@ import { CricketProductDetailScreen } from '../screens/CricketProductDetailScree
 import { CricketCheckoutScreen } from '../screens/CricketCheckoutScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { BookingSuccessScreen } from '../screens/BookingSuccessScreen';
+import { OrderTrackingScreen } from '../screens/OrderTrackingScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AuthWelcomeScreen } from '../screens/AuthWelcomeScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
@@ -28,6 +29,7 @@ import { SavedAddressesScreen } from '../screens/SavedAddressesScreen';
 import { CloseButton } from '../components/CloseButton';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../constants/theme';
+import { navigationRef } from './rootNavigation';
 import type {
   HomeStackParamList,
   ProductsStackParamList,
@@ -250,7 +252,7 @@ function MainTabs() {
 
 export function AppNavigator() {
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} ref={navigationRef}>
       <RootStack.Navigator screenOptions={stackScreenOptions}>
         <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
         <RootStack.Screen
@@ -277,6 +279,11 @@ export function AppNavigator() {
           name="BookingSuccess"
           component={BookingSuccessScreen}
           options={{ headerShown: false, gestureEnabled: false, headerRight: undefined }}
+        />
+        <RootStack.Screen
+          name="OrderTracking"
+          component={OrderTrackingScreen}
+          options={{ headerShown: false, headerRight: undefined }}
         />
       </RootStack.Navigator>
     </NavigationContainer>

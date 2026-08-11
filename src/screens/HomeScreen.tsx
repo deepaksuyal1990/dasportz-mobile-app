@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { HomeHeader, HOME_HEADER_HEIGHT } from '../components/AppHeader';
 import { CategoryCard } from '../components/CategoryCard';
 import { ServiceRow } from '../components/ServiceRow';
@@ -24,14 +25,21 @@ import { navigateToCategory } from '../utils/navigation';
 import { preloadSearchIndex } from '../services/searchService';
 import { fetchCricketProducts } from '../services/productsApi';
 import { pickBestsellers } from '../utils/productPicks';
+import { getLatestTrackableOrder } from '../services/orderHistory';
+import {
+  ORDER_TRACKING_STEPS,
+  getStatusTheme,
+  resolveOrderTrackingStatus,
+} from '../data/orderTracking';
 import type { CricketProduct } from '../types/product';
-import { navigateToTab } from '../utils/navHelpers';
+import type { PastOrder } from '../types/auth';
+import { navigateToOrderTracking, navigateToTab } from '../utils/navHelpers';
+import { useAuth } from '../context/AuthContext';
 import type { HomeStackScreenProps } from '../navigation/types';
 
 type Props = HomeStackScreenProps<'HomeMain'>;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ACTION_CARD_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm) / 2;
+const TAB_BAR_HEIGHT = 88;
 const HOME_SERVICES = services.slice(0, 3);
 const HOME_CATEGORIES = productCategories.slice(0, 3);
 
@@ -72,14 +80,33 @@ const primaryActions = [
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerSpace = insets.top + HOME_HEADER_HEIGHT;
+  /** Full first viewport above the tab bar so the store photo reaches the bottom. */
+  const heroHeight = Math.max(420, screenHeight - TAB_BAR_HEIGHT);
+  const actionCardWidth = (screenWidth - spacing.lg * 2 - spacing.sm) / 2;
   const [bestsellers, setBestsellers] = useState<CricketProduct[]>([]);
   const [picksLoading, setPicksLoading] = useState(true);
+  const [activeOrder, setActiveOrder] = useState<PastOrder | null>(null);
 
   useEffect(() => {
     preloadSearchIndex();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void (async () => {
+        const latest = await getLatestTrackableOrder(user?.phone);
+        if (!cancelled) setActiveOrder(latest);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [user?.phone]),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -140,21 +167,22 @@ export function HomeScreen({ navigation }: Props) {
           useNativeDriver: true,
         })}
       >
-        {/* Full-bleed photo hero */}
-        <View style={[styles.heroSection, { paddingTop: headerSpace + spacing.md }]}>
+        {/* Full-bleed photo hero — fills first screen */}
+        <View style={[styles.heroSection, { height: heroHeight, paddingTop: headerSpace + spacing.md }]}>
           <Image
             source={require('../../assets/splash-background.jpg')}
-            style={styles.heroImage}
+            style={[styles.heroImage, { width: screenWidth, height: heroHeight }]}
             resizeMode="cover"
           />
           <LinearGradient
             colors={[
-              'rgba(2,8,20,0.55)',
-              'rgba(6,13,24,0.45)',
-              'rgba(6,13,24,0.88)',
+              'rgba(2,8,20,0.42)',
+              'rgba(6,13,24,0.28)',
+              'rgba(6,13,24,0.55)',
+              'rgba(6,13,24,0.92)',
               colors.background,
             ]}
-            locations={[0, 0.35, 0.75, 1]}
+            locations={[0, 0.35, 0.62, 0.88, 1]}
             style={StyleSheet.absoluteFill}
           />
 
@@ -167,7 +195,7 @@ export function HomeScreen({ navigation }: Props) {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.heroSub}>
+            <Text style={[styles.heroSub, { maxWidth: screenWidth * 0.88 }]}>
               Genuine gear & expert stringing — train, compete, win.
             </Text>
             <TouchableOpacity
@@ -181,6 +209,44 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {activeOrder ? (
+          <View style={styles.section}>
+            {(() => {
+              const activeStatus = resolveOrderTrackingStatus(activeOrder);
+              const theme = getStatusTheme(activeStatus);
+              return (
+            <TouchableOpacity
+              style={[styles.trackCard, { borderColor: theme.border }]}
+              activeOpacity={0.9}
+              onPress={() => navigateToOrderTracking(navigation, activeOrder.orderId)}
+            >
+              <LinearGradient
+                colors={[theme.soft, 'rgba(15,28,46,0.95)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.trackCardInner}
+              >
+                <View style={[styles.trackIcon, { backgroundColor: theme.soft }]}>
+                  <Ionicons name="navigate-circle" size={26} color={theme.color} />
+                </View>
+                <View style={styles.trackCopy}>
+                  <Text style={[styles.trackEyebrow, { color: theme.color }]}>TRACK ORDER</Text>
+                  <Text style={styles.trackTitle} numberOfLines={1}>
+                    {ORDER_TRACKING_STEPS.find((s) => s.id === activeStatus)?.title ??
+                      'Order received'}
+                  </Text>
+                  <Text style={styles.trackSub} numberOfLines={1}>
+                    {activeOrder.orderId} · {activeOrder.amount}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.color} />
+              </LinearGradient>
+            </TouchableOpacity>
+              );
+            })()}
+          </View>
+        ) : null}
+
         {/* Quick Access */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>QUICK ACCESS</Text>
@@ -193,7 +259,7 @@ export function HomeScreen({ navigation }: Props) {
                 icon={action.icon}
                 image={action.image}
                 gradient={action.gradient}
-                width={ACTION_CARD_WIDTH}
+                width={actionCardWidth}
                 onPress={() => handleAction(action.id)}
               />
             ))}
@@ -321,19 +387,19 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   heroSection: {
-    minHeight: 320,
+    width: '100%',
     overflow: 'hidden',
     marginBottom: spacing.lg,
     justifyContent: 'flex-end',
   },
   heroImage: {
-    ...StyleSheet.absoluteFill,
-    width: SCREEN_WIDTH,
-    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   heroInner: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xl + spacing.md,
   },
   heroBrandRow: {
     flexDirection: 'row',
@@ -357,7 +423,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     lineHeight: 24,
-    maxWidth: SCREEN_WIDTH * 0.88,
     marginBottom: spacing.lg,
   },
   heroCta: {
@@ -378,6 +443,39 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
+  },
+  trackCard: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  trackCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  trackIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackCopy: { flex: 1, minWidth: 0 },
+  trackEyebrow: {
+    ...typography.label,
+    marginBottom: 2,
+  },
+  trackTitle: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '800',
+  },
+  trackSub: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   sectionHead: {
     flexDirection: 'row',

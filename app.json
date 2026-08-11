@@ -2,7 +2,7 @@
   "expo": {
     "name": "DA SPORTZ",
     "slug": "dasportz-mobile-app",
-    "version": "1.0.0",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -67,6 +67,12 @@
           "photosPermission": "Allow DA SPORTZ to access your photos for your profile picture."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "whatsapp": {
+        "provider": "playnex-twilio",
+        "apiBase": "https://kg7kg65ok2hvfox6l4gtniqhsi0ckmox.lambda-url.ap-south-1.on.aws"
+      }
+    }
   }
 }

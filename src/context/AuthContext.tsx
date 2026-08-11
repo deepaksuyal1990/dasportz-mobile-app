@@ -180,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const accounts = await loadAccounts();
       const existing = accounts.find((a) => a.phone === phone && a.mode === 'member');
       if (!existing) {
-        throw new Error('No account found for this number. Please sign up first.');
+        throw new Error('ACCOUNT_NOT_FOUND');
       }
 
       await persistSession(existing);

@@ -10,6 +10,8 @@ import {
 import type { AppNotification } from '../types/notification';
 import {
   appendNotification,
+  clearAllNotifications,
+  deleteNotification,
   loadNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -22,6 +24,8 @@ type NotificationContextValue = {
   addNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'createdAt'> & { id?: string }) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  deleteNotificationById: (id: string) => Promise<void>;
+  clearNotifications: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -55,6 +59,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         orderId: notification.orderId,
         amount: notification.amount,
         paymentMethod: notification.paymentMethod,
+        status: notification.status,
         read: false,
         createdAt: new Date().toISOString(),
       };
@@ -74,6 +79,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications(next);
   }, []);
 
+  const deleteNotificationById = useCallback(async (id: string) => {
+    const next = await deleteNotification(id);
+    setNotifications(next);
+  }, []);
+
+  const clearNotifications = useCallback(async () => {
+    const next = await clearAllNotifications();
+    setNotifications(next);
+  }, []);
+
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
     [notifications],
@@ -87,9 +102,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       addNotification,
       markAsRead,
       markAllAsRead,
+      deleteNotificationById,
+      clearNotifications,
       refresh,
     }),
-    [notifications, unreadCount, loading, addNotification, markAsRead, markAllAsRead, refresh],
+    [
+      notifications,
+      unreadCount,
+      loading,
+      addNotification,
+      markAsRead,
+      markAllAsRead,
+      deleteNotificationById,
+      clearNotifications,
+      refresh,
+    ],
   );
 
   return (

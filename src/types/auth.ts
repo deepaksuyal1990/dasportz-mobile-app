@@ -74,4 +74,9 @@ export type PastOrder = {
   customerName: string;
   details: Array<{ label: string; value: string }>;
   createdAt: string;
+  /** Manual / persisted status. `delivered` is set when the customer confirms pickup. */
+  trackingStatus?: import('../data/orderTracking').OrderTrackingStatus;
+  deliveredAt?: string;
+  /** Last status we already sent an in-app notification for. */
+  lastNotifiedStatus?: import('../data/orderTracking').OrderTrackingStatus;
 };
